@@ -8,12 +8,12 @@ To start the simulation, the initial locations and velocities of all the stars i
 = Details =
 
 Each line in the file is for a specific star.  The data included in the file are:
-* x position
-* y position
-* z position
-* x velocity
-* y velocity
-* z velocity
+  * x position
+  * y position
+  * z position
+  * x velocity
+  * y velocity
+  * z velocity
 
 These are stored as comma separated values per line. A single line is defined as follows:
 
