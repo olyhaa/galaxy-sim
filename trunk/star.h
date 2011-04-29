@@ -46,13 +46,14 @@ typedef struct
 
 /********** Variable Declarations **********/
 
-double closest_stars[NUMBER_OF_STARS/STARS_IN_CLUSTER][STARS_IN_CLUSTER];  //Keeps track of star indices for faster cluster computation
+double closest_cluster_stars[NUMBER_OF_STARS/STARS_IN_CLUSTER][STARS_IN_CLUSTER];  //Keeps track of star indices for faster cluster computation
 
 
 /********** Function Headers **********/
 
 star cluster();
 double distance(star self, star other);
+int* get_stars_within_range(int origin);
 int* get_closest_stars(int origin);
 
 /********** Function Declarations **********/
@@ -102,9 +103,9 @@ double distance(star self, star other)
  * Determine which stars are within GRAVITATION_DISTANCE of the origin star
  * 
  * INPUT: the index of the origin star
- * OUTPUT: an array of the indices of the stars within that distance
+ * OUTPUT: an array of the indices of the stars no farther than GRAVITATION_DISTANCE away
  */
-int* get_closest_stars(int origin)
+int* get_stars_within_range(int origin)
 {
 	int size = NUMBER_OF_STARS / 10;
 	int num_stars = 0;
@@ -126,6 +127,34 @@ int* get_closest_stars(int origin)
 	return list;
 }
 
-
+/**
+ * Determine the closest STARS_IN_CLUSTER stars to the origin star
+ * 
+ * INPUT: the index of the origin star
+ * OUTPUT: an array of the indices of the STARS_IN_CLUSTER closest stars
+ */
+int* get_closest_stars(int origin)
+{
+	int* cluster = (int*)malloc(sizeof(int) * STARS_IN_CLUSTER);
+	int* list_of_stars = get_stars_within_range(origin);
+	int x,y;
+	int index = 0;
+	for(x=0;x<STARS_IN_CLUSTER;x++)
+	{
+		double min = 100000.0;
+		for(y=0;x<sizeof(list_of_stars)/sizeof(int);y++)  //Loop through the list of stars within range, finding the closest
+		{
+			double dist = distance(get_star(origin),get_star(list_of_stars[y]));
+			if(list_of_stars[y] != -1 && dist < min)
+			{
+				min = dist;
+				index = y;
+			}
+		}
+		cluster[x] = list_of_stars[y];
+		list_of_stars[y] = -1;  //Once a closest star is found, set the index in the list to -1 so it isn't found again
+	}
+	return cluster;
+}
 
 #endif
