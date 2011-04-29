@@ -21,38 +21,61 @@
 #include <math.h>
 #include <mpi.h>
 #include "star.h"
+#include "io.h"
+#include "timing.h"
 
 /********** Variable Definitions **********/
 
-#define OUTPUT_INTERVAL 100	//Number of timesteps between each output of the current simulation state
+#define OUTPUT_INTERVAL 100  // Number of timesteps between each output 
+                             // of the current simulation state
 
 /********** Variable Declarations **********/
 
 int my_rank;
 int my_size;
 MPI_Status status;
-double* galaxy;
+star* galaxy;
+
 
 /********** Function Headers **********/
 
 void initialize();
 star get_star(int index);
 
+
 /********** Function Declarations **********/
 
 int main(int argc, char* argv[])
 {
-	MPI_Init(&argc, &argv);
-	MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-	MPI_Comm_size(MPI_COMM_WORLD, &my_size);
+  // initialize MPI environment
+  if (MPI_Init(&argc, &argv) != MPI_SUCCESS) {
+    printf("MPI intialization failed.\n");
+    exit(1);
+  }
+
+  // get number of processors, current rank
+  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &my_size);
+
+  initialize();
+
+
+
+
+
+
+  MPI_Finalize();
+
+  return 0;
 }
 
 /**
- * Call helper functions to load the data, create the array, and otherwise set up the program's initial conditions.
+ * Call helper functions to load the data, create the array,
+ * and otherwise set up the program's initial conditions.
  */
-void initialize()
+void initialize() 
 {
-	
+  galaxy = getStarInfo("initialStarConfig.dat");
 }
 
 /**
@@ -60,5 +83,5 @@ void initialize()
  */
 star get_star(int index)
 {
-	return galaxy[index];
+  return galaxy[index];
 }
