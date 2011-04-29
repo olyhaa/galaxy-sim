@@ -80,8 +80,20 @@ void initialize()
 
 /**
  * Return the star at a given index in the array of stars
+ * 
+ * INPUT: index of desired star
  */
 star get_star(int index)
+{
+  return galaxy[index];
+}
+
+/**
+ * Set the star at index to new value
+ * 
+ * INPUT: index of desired star, desired star
+ */
+void set_star(int index, star self)
 {
   return galaxy[index];
 }

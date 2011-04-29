@@ -35,6 +35,10 @@ typedef struct
 	double z_v;
 	//Mass of star -- currently all stars are assumed to have the same mass
 	double mass;
+	//Acceleration components -- used only for gravitational calculations, not otherwise accessed directly
+	double x_acc;
+	double y_acc;
+	double z_acc;
 } star;
 
 /********** Variable Definitions **********/
@@ -47,6 +51,7 @@ typedef struct
 /********** Variable Declarations **********/
 
 double closest_cluster_stars[NUMBER_OF_STARS/STARS_IN_CLUSTER][STARS_IN_CLUSTER];  //Keeps track of star indices for faster cluster computation
+double G = 4.49734287 * pow(10.0,-9)  //Gravitational constant, using units of parsecs * (solar mass units)^-1 * (parsecs/millennium)^2
 
 
 /********** Function Headers **********/
@@ -55,6 +60,8 @@ star cluster();
 double distance(star self, star other);
 int* get_stars_within_range(int origin);
 int* get_closest_stars(int origin);
+void apply_gravitation(int origin);
+star force_of_gravity(int self_index, int other_index)
 
 /********** Function Declarations **********/
 
@@ -91,7 +98,8 @@ star cluster(star[] cluster_stars)
 /**
  * Calculate the distance between two given stars
  * 
- * OUTPUT: 3-dimensional distance as a double
+ * INPUT: the two stars under consideration
+ * OUTPUT: 3-dimensional distance between the input stars as a double
  */
 double distance(star self, star other)
 {
@@ -119,7 +127,7 @@ int* get_stars_within_range(int origin)
 			list[num_stars++] = x;
 			if(num_stars >= size)  //Expand the array if necessary
 			{
-				size *= 2;
+				size += 1;
 				list = (int*)realloc(list, sizeof(int) * size);
 			}
 		}
@@ -155,6 +163,47 @@ int* get_closest_stars(int origin)
 		list_of_stars[y] = -1;  //Once a closest star is found, set the index in the list to -1 so it isn't found again
 	}
 	return cluster;
+}
+
+/**
+ * Apply the net gravitational force to the star
+ * 
+ * INPUT: the index of the star under consideration
+ */
+void apply_gravitation(int origin)
+{
+	int* other_stars = get_stars_within_range(origin);
+	int x;
+	star self;
+	self.x_acc = self.y_acc = self.z_acc = 0.0;
+	for(x=0;x<sizeof(other_stars)/sizeof(int);x++)
+	{
+		star temp = force_of_gravity(origin,x);
+		self.x_acc += temp.x_acc;
+		self.y_acc += temp.y_acc;
+		self.z_acc += temp.z_acc;
+	}
+	set_star(origin, self);
+}
+
+/**
+ * Determine the magnitude of the gravitational force of one star on another
+ * 
+ * INPUT: the indices of the two stars under consideration
+ * OUTPUT: a "dummy" star holding the resulting acceleration data
+ */
+star force_of_gravity(int self_index, int other_index)
+{
+	star self = get_star(self_index);
+	star other = get_star(other_index);
+	star storage;
+	double r = distance(self, other);
+	double force = G * self.mass * other.mass;
+	force /= pow(r,3);
+	storage.x_acc = force * (other.x_pos - self.x_pos);
+	storage.y_acc = force * (other.y_pos - self.y_pos);
+	storage.z_acc = force * (other.z_pos - self.z_pos);
+	return storage;
 }
 
 #endif
