@@ -29,8 +29,8 @@
 
 /********** Function Headers **********/
 
-star* getStarInfo(char* fileName, int fileSize);
-int printStarInfo(char* fileName, star* starArr, int numStars);
+void getStarInfo(char* fileName, star* galaxy[]);
+int printStarInfo(char* fileName, star* galaxy[]);
 
 /********** Function Declarations **********/
 
@@ -43,42 +43,36 @@ int printStarInfo(char* fileName, star* starArr, int numStars);
  *         int number of stars
  * OUTPUT: array of stars
  */
-star* getStarInfo(char* fileName, int fileSize) {
+void getStarInfo(char* fileName, star* galaxy[]) {
 
   // get file, open it
   FILE *file;
   file = fopen(fileName, "r");
   if (file == NULL) {
     fprintf(stderr, "Cannot open %s to read in.\n", fileName);
-    return NULL;
+    return;
   }
-
-  // create array
-  star* starArr = (star*) malloc(sizeof(star) * fileSize);
 
   // parse through file, adding to array
   int i = 0;
   float x_p, y_p, z_p, x_vl, y_vl, z_vl;
 
   while (fscanf(file, "%f, %f, %f, %f, %f, %f", &x_p, &y_p, &z_p, &x_vl, &y_vl, &z_vl) != EOF) {
-    star myStar;
-    myStar.x_pos = x_p;
-    myStar.y_pos = y_p;
-    myStar.z_pos = z_p;
-    myStar.x_v = x_vl;
-    myStar.y_v = y_vl;
-    myStar.z_v = z_vl;
+    star* myStar;
+    myStar->x_pos = x_p;
+    myStar->y_pos = y_p;
+    myStar->z_pos = z_p;
+    myStar->x_v = x_vl;
+    myStar->y_v = y_vl;
+    myStar->z_v = z_vl;
     // myStar.mass = m;
 
-    starArr[i] = myStar;
+    galaxy[i] = myStar;
     i++;
   }
 
   // close file
   fclose(file);
-
-  // return array
-  return starArr;
 }
 
 
@@ -93,7 +87,7 @@ star* getStarInfo(char* fileName, int fileSize) {
  * OUTPUT: 1 = error in creating file
  *         0 = success
  */
-int printStarInfo(char* fileName, star* starArr, int numStars) {
+int printStarInfo(char* fileName, star* galaxy[]) {
 
   // get file, open it
   FILE *file;
@@ -106,8 +100,8 @@ int printStarInfo(char* fileName, star* starArr, int numStars) {
   int i;
 
   // loop through array and output state of each star
-  for (i = 0; i < numStars; i++) {
-    fprintf(file, "%f, %f, %f, %f, %f, %f\n", (starArr[i]).x_pos, (starArr[i]).y_pos, (starArr[i]).z_pos, (starArr[i]).x_v, (starArr[i]).y_v, (starArr[i]).z_v);
+  for (i = 0; i < NUMBER_OF_STARS; i++) {
+    fprintf(file, "%f, %f, %f, %f, %f, %f\n", (galaxy[i])->x_pos, (galaxy[i])->y_pos, (galaxy[i])->z_pos, (galaxy[i])->x_v, (galaxy[i])->y_v, (galaxy[i])->z_v);
   }
 
   // close file

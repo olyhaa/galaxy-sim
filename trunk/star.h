@@ -51,17 +51,15 @@ typedef struct
 /********** Variable Declarations **********/
 
 double closest_cluster_stars[NUMBER_OF_STARS/STARS_IN_CLUSTER][STARS_IN_CLUSTER];  //Keeps track of star indices for faster cluster computation
-double G = 4.49734287 * pow(10.0,-9)  //Gravitational constant, using units of parsecs * (solar mass units)^-1 * (parsecs/millennium)^2
-
 
 /********** Function Headers **********/
 
-star cluster();
-double distance(star self, star other);
+star* cluster(star* cluster_stars[]);
+double distance(int self_index, int other_index);
 int* get_stars_within_range(int origin);
 int* get_closest_stars(int origin);
 void apply_gravitation(int origin);
-star force_of_gravity(int self_index, int other_index)
+star* force_of_gravity(int self_index, int other_index);
 
 /********** Function Declarations **********/
 
@@ -69,11 +67,12 @@ star force_of_gravity(int self_index, int other_index)
  * Group the stars into clusters of CLUSTER_OF_STARS "virtual stars" to make calculations on the stars less memory-intensive when passing data around
  * via MPI.
  * 
- * OUTPUT: Star containing agreggate star cluster data
+ * INPUT: array of stars to be clustered
+ * OUTPUT: star containing agreggate star cluster data
  */
-star cluster(star[] cluster_stars)
+star* cluster(star* cluster_stars[])
 {
-	star collective;
+	star* collective;
 	double sum_of_masses = 0.0;
 	double sum_of_x = 0.0;
 	double sum_of_y = 0.0;
@@ -81,17 +80,17 @@ star cluster(star[] cluster_stars)
 	int x;
 	for(x=0;x<STARS_IN_CLUSTER;x++)
 	{
-		sum_of_masses += cluster_stars[x].mass;
-		sum_of_x += cluster_stars[x].x_pos * cluster_stars[x].mass;
-		sum_of_y += cluster_stars[x].y_pos * cluster_stars[x].mass;
-		sum_of_z += cluster_stars[x].z_pos * cluster_stars[x].mass;
+		sum_of_masses += cluster_stars[x]->mass;
+		sum_of_x += cluster_stars[x]->x_pos * cluster_stars[x]->mass;
+		sum_of_y += cluster_stars[x]->y_pos * cluster_stars[x]->mass;
+		sum_of_z += cluster_stars[x]->z_pos * cluster_stars[x]->mass;
 	}
 	sum_of_x /= sum_of_masses;
 	sum_of_y /= sum_of_masses;
 	sum_of_z /= sum_of_masses;
-	collective.x_pos = sum_of_x;
-	collective.y_pos = sum_of_y;
-	collective.z_pos = sum_of_z;
+	collective->x_pos = sum_of_x;
+	collective->y_pos = sum_of_y;
+	collective->z_pos = sum_of_z;
 	return collective;	
 }
 
@@ -101,9 +100,11 @@ star cluster(star[] cluster_stars)
  * INPUT: the two stars under consideration
  * OUTPUT: 3-dimensional distance between the input stars as a double
  */
-double distance(star self, star other)
+double distance(int self_index, int other_index)
 {
-	double dist = pow(other.x_pos-self.x_pos,2) + pow(other.y_pos-self.y_pos,2) + pow(other.z_pos-self.z_pos,2);
+	star* self = (star*)get_star(self_index);
+	star* other = (star*)get_star(other_index);
+	double dist = pow(other->x_pos - self->x_pos,2) + pow(other->y_pos - self->y_pos,2) + pow(other->z_pos - self->z_pos,2);
 	return sqrt(dist);
 }
 
@@ -122,7 +123,7 @@ int* get_stars_within_range(int origin)
 	int x;
 	for(x=0;x<NUMBER_OF_STARS;x++)
 	{
-		if(x != origin && distance(get_star(origin),get_star(x)) < GRAVITATION_DISTANCE)
+		if(x != origin && distance(origin,x) < GRAVITATION_DISTANCE)
 		{
 			list[num_stars++] = x;
 			if(num_stars >= size)  //Expand the array if necessary
@@ -152,7 +153,7 @@ int* get_closest_stars(int origin)
 		double min = 100000.0;
 		for(y=0;x<sizeof(list_of_stars)/sizeof(int);y++)  //Loop through the list of stars within range, finding the closest
 		{
-			double dist = distance(get_star(origin),get_star(list_of_stars[y]));
+			double dist = distance(origin,list_of_stars[y]);
 			if(list_of_stars[y] != -1 && dist < min)
 			{
 				min = dist;
@@ -174,14 +175,14 @@ void apply_gravitation(int origin)
 {
 	int* other_stars = get_stars_within_range(origin);
 	int x;
-	star self;
-	self.x_acc = self.y_acc = self.z_acc = 0.0;
+	star* self = (star*)get_star(origin);
+	self->x_acc = self->y_acc = self->z_acc = 0.0;
 	for(x=0;x<sizeof(other_stars)/sizeof(int);x++)
 	{
-		star temp = force_of_gravity(origin,x);
-		self.x_acc += temp.x_acc;
-		self.y_acc += temp.y_acc;
-		self.z_acc += temp.z_acc;
+		star* temp = force_of_gravity(origin,x);
+		self->x_acc += temp->x_acc;
+		self->y_acc += temp->y_acc;
+		self->z_acc += temp->z_acc;
 	}
 	set_star(origin, self);
 }
@@ -192,17 +193,18 @@ void apply_gravitation(int origin)
  * INPUT: the indices of the two stars under consideration
  * OUTPUT: a "dummy" star holding the resulting acceleration data
  */
-star force_of_gravity(int self_index, int other_index)
+star* force_of_gravity(int self_index, int other_index)
 {
-	star self = get_star(self_index);
-	star other = get_star(other_index);
-	star storage;
-	double r = distance(self, other);
-	double force = G * self.mass * other.mass;
+	double G = 4.49734287 * pow(10.0,-9);  //Gravitational constant, using units of parsecs * (solar mass units)^-1 * (parsecs/millennium)^2
+	star* self = (star*)get_star(self_index);
+	star* other = (star*)get_star(other_index);
+	star* storage;
+	double r = distance(self_index, other_index);
+	double force = G * self->mass * other->mass;
 	force /= pow(r,3);
-	storage.x_acc = force * (other.x_pos - self.x_pos);
-	storage.y_acc = force * (other.y_pos - self.y_pos);
-	storage.z_acc = force * (other.z_pos - self.z_pos);
+	storage->x_acc = force * (other->x_pos - self->x_pos);
+	storage->y_acc = force * (other->y_pos - self->y_pos);
+	storage->z_acc = force * (other->z_pos - self->z_pos);
 	return storage;
 }
 
