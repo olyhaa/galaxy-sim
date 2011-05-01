@@ -28,6 +28,7 @@
 
 #define OUTPUT_INTERVAL 100  // Number of timesteps between each output 
                              // of the current simulation state
+#define MAX_COUNT 50000000   // maximum number of iterations
 
 /********** Variable Declarations **********/
 
@@ -57,12 +58,42 @@ int main(int argc, char* argv[])
   MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
   MPI_Comm_size(MPI_COMM_WORLD, &my_size);
 
-  initialize();
+  // make sure the number of processors is valid
+  if (NUMBER_OF_STARS % my_size != 0) {
+    printf("The number of stars must be divisible by the processor world size.\n");
+    exit(1);
+  }
 
+  // read in stars from file
+  if (my_rank == 0)
+    initialize();
 
+  double** my_data;
 
+  int count = 0;
+  while (count < MAX_COUNT) {
 
+    // sync up all processors
+    if (MPI_Barrier(MPI_COMM_WORLD) != MPI_SUCCESS) {
+      printf("MPI_Barrier error in processor %d \n", my_rank);
+      exit(1);
+    }
 
+    // calculate new positions, update star array
+    for (i = 0; i < NUMBER_OF_STARS / my_size; i++)
+      apply_gravitation(my_rank * my_size + i);
+   
+    count++;
+    
+    // print out state if needed
+    if ((my_rank == 0) && (count % UPDATE_INTERVAL == 0)) {
+      char str[100];
+      strcpy(str, "outFile");
+      strcat(str, count);
+      strcat(str, ".dat");
+      printStarInfo(str, galaxy, NUMBER_OF_STARS);
+    }
+  }
 
   MPI_Finalize();
 
