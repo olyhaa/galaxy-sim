@@ -68,8 +68,6 @@ int main(int argc, char* argv[])
 	if (my_rank == 0)
 		initialize();
 
-	double** my_data;
-
 	int count = 0;
 	while (count < MAX_COUNT) {
 
@@ -87,9 +85,10 @@ int main(int argc, char* argv[])
 		
 		// print out state if needed
 		if ((my_rank == 0) && (count % UPDATE_INTERVAL == 0)) {
-			char str[100];
+		        char str[100], cstr[100];
 			strcpy(str, "outFile");
-			strcat(str, count);
+			sprintf(cstr, "%d", count);
+			strcat(str, cstr);
 			strcat(str, ".dat");
 			printStarInfo(str, galaxy);
 		}
