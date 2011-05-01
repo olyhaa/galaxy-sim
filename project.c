@@ -1,8 +1,8 @@
 /*
  * GalaxySim
  * Copyright (c) 2011 Cody Garges <gargec@rpi.edu>
- *                    James McAtamney <mcataj@cs.rpi.edu>
- *                    Amanda Olyha <olyhaa@rpi.edu>
+ *										James McAtamney <mcataj@cs.rpi.edu>
+ *										Amanda Olyha <olyhaa@rpi.edu>
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"),
  * to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
@@ -20,84 +20,84 @@
 #include <stdio.h>
 #include <math.h>
 #include <mpi.h>
+#include <string.h>
 #include "star.h"
 #include "io.h"
 #include "timing.h"
 
 /********** Variable Definitions **********/
 
-#define OUTPUT_INTERVAL 100  // Number of timesteps between each output 
-                             // of the current simulation state
-#define MAX_COUNT 50000000   // maximum number of iterations
+#define OUTPUT_INTERVAL 100	// Number of timesteps between each output of the current simulation state
+#define MAX_COUNT 50000000	 // maximum number of iterations
 
 /********** Variable Declarations **********/
 
 int my_rank;
 int my_size;
 MPI_Status status;
-star* galaxy;
+star* galaxy[NUMBER_OF_STARS];
 
 
 /********** Function Headers **********/
 
 void initialize();
-star get_star(int index);
-
+star* get_star(int index);
+void set_star(int index, star* self);
 
 /********** Function Declarations **********/
 
 int main(int argc, char* argv[])
 {
-  // initialize MPI environment
-  if (MPI_Init(&argc, &argv) != MPI_SUCCESS) {
-    printf("MPI intialization failed.\n");
-    exit(1);
-  }
+	// initialize MPI environment
+	if (MPI_Init(&argc, &argv) != MPI_SUCCESS) {
+		printf("MPI intialization failed.\n");
+		exit(1);
+	}
 
-  // get number of processors, current rank
-  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &my_size);
+	// get number of processors, current rank
+	MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &my_size);
 
-  // make sure the number of processors is valid
-  if (NUMBER_OF_STARS % my_size != 0) {
-    printf("The number of stars must be divisible by the processor world size.\n");
-    exit(1);
-  }
+	// make sure the number of processors is valid
+	if (NUMBER_OF_STARS % my_size != 0) {
+		printf("The number of stars must be divisible by the processor world size.\n");
+		exit(1);
+	}
 
-  // read in stars from file
-  if (my_rank == 0)
-    initialize();
+	// read in stars from file
+	if (my_rank == 0)
+		initialize();
 
-  double** my_data;
+	double** my_data;
 
-  int count = 0;
-  while (count < MAX_COUNT) {
+	int count = 0;
+	while (count < MAX_COUNT) {
 
-    // sync up all processors
-    if (MPI_Barrier(MPI_COMM_WORLD) != MPI_SUCCESS) {
-      printf("MPI_Barrier error in processor %d \n", my_rank);
-      exit(1);
-    }
+		// sync up all processors
+		if (MPI_Barrier(MPI_COMM_WORLD) != MPI_SUCCESS) {
+			printf("MPI_Barrier error in processor %d \n", my_rank);
+			exit(1);
+		}
+		int i;
+		// calculate new positions, update star array
+		for (i = 0; i < NUMBER_OF_STARS / my_size; i++)
+			apply_gravitation(my_rank * my_size + i);
+	 
+		count++;
+		
+		// print out state if needed
+		if ((my_rank == 0) && (count % UPDATE_INTERVAL == 0)) {
+			char str[100];
+			strcpy(str, "outFile");
+			strcat(str, count);
+			strcat(str, ".dat");
+			printStarInfo(str, galaxy);
+		}
+	}
 
-    // calculate new positions, update star array
-    for (i = 0; i < NUMBER_OF_STARS / my_size; i++)
-      apply_gravitation(my_rank * my_size + i);
-   
-    count++;
-    
-    // print out state if needed
-    if ((my_rank == 0) && (count % UPDATE_INTERVAL == 0)) {
-      char str[100];
-      strcpy(str, "outFile");
-      strcat(str, count);
-      strcat(str, ".dat");
-      printStarInfo(str, galaxy, NUMBER_OF_STARS);
-    }
-  }
+	MPI_Finalize();
 
-  MPI_Finalize();
-
-  return 0;
+	return 0;
 }
 
 /**
@@ -106,7 +106,7 @@ int main(int argc, char* argv[])
  */
 void initialize() 
 {
-  galaxy = getStarInfo("initialStarConfig.dat");
+	getStarInfo("initialStarConfig.dat", galaxy);
 }
 
 /**
@@ -114,9 +114,9 @@ void initialize()
  * 
  * INPUT: index of desired star
  */
-star get_star(int index)
+star* get_star(int index)
 {
-  return galaxy[index];
+	return galaxy[index];
 }
 
 /**
@@ -124,7 +124,7 @@ star get_star(int index)
  * 
  * INPUT: index of desired star, desired star
  */
-void set_star(int index, star self)
+void set_star(int index, star* self)
 {
-  return galaxy[index];
+	galaxy[index] = self;
 }
