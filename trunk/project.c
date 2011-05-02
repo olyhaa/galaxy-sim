@@ -36,6 +36,7 @@ int my_rank;
 int my_size;
 MPI_Status status;
 star* galaxy[NUMBER_OF_STARS];
+star* new_galaxy[NUMBER_OF_STARS];
 
 
 /********** Function Headers **********/
@@ -125,5 +126,16 @@ star* get_star(int index)
  */
 void set_star(int index, star* self)
 {
-	galaxy[index] = self;
+	new_galaxy[index] = self;
+}
+
+/**
+ * Set the state of the galaxy (galaxy) to the new state after computation (new galaxy)
+ */
+void update_galaxy()
+{
+	star** old = galaxy;
+	star** new = new_galaxy;
+	old = new;
+	memset(old, 0, sizeof(old));
 }
