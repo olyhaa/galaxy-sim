@@ -20,6 +20,7 @@
 #define GALAXY_SIM_IO_H
 
 #include "star.h"
+#include "mpi.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -34,7 +35,6 @@ int printStarInfo(char* fileName, star* galaxy[]);
 
 /********** Function Declarations **********/
 
-
 /*
  * Parses through input file to retrieve all star info.  All information is
  * put into an array of stars which is returned.
@@ -46,18 +46,24 @@ int printStarInfo(char* fileName, star* galaxy[]);
 void getStarInfo(char* fileName, star* galaxy[]) {
 
   // get file, open it
-  FILE *file;
-  file = fopen(fileName, "r");
-  if (file == NULL) {
+  MPI_File file;
+  if (MPI_File_open(MPI_COMM_WORLD, fileName, MPI_MODE_RDONLY, MPI_INFO_NULL, &file) != MPI_SUCCESS) {
     fprintf(stderr, "Cannot open %s to read in.\n", fileName);
     return;
   }
 
   // parse through file, adding to array
-  int i = 0;
   float x_p, y_p, z_p, x_vl, y_vl, z_vl;
+  char buf[1024]; 
+  int i, offset, numStars = NUMBER_OF_STARS / getMySize(), line_length = 181; // 19 chars per field, 7 fields, 6 separating commas
+  MPI_Status status;
 
-  while (fscanf(file, "%f, %f, %f, %f, %f, %f", &x_p, &y_p, &z_p, &x_vl, &y_vl, &z_vl) != EOF) {
+  for (i = 0; i <numStars; i++) {
+    offset = getMyRank() * line_length * numStars + i;
+    MPI_File_read_at(file, offset, buf, line_length, MPI_CHAR, &status);
+
+    sscanf(buf, "%f,%f,%f,%f,%f,%f", &x_p, &y_p, &z_p, &x_vl, &y_vl, &z_vl);
+
     star* myStar;
     myStar->x_pos = x_p;
     myStar->y_pos = y_p;
@@ -72,7 +78,7 @@ void getStarInfo(char* fileName, star* galaxy[]) {
   }
 
   // close file
-  fclose(file);
+  MPI_File_close(&file);
 }
 
 
@@ -90,23 +96,28 @@ void getStarInfo(char* fileName, star* galaxy[]) {
 int printStarInfo(char* fileName, star* galaxy[]) {
 
   // get file, open it
-  FILE *file;
-  file = fopen(fileName, "w");
-  if (file == NULL) {
-    fprintf(stderr, "Cannot create %s to write out.\n", fileName);
+  MPI_File file;
+  if (MPI_File_open(MPI_COMM_WORLD, fileName, MPI_MODE_CREATE, MPI_INFO_NULL, &file) != MPI_SUCCESS) {
+    fprintf(stderr, "Cannot create %s.\n", fileName);
     return 1;
   }
 
-  int i;
+  char buf[1024]; 
+  int i, offset, numStars = NUMBER_OF_STARS / getMySize(), line_length = 181;
+  MPI_Status status;
 
   // loop through array and output state of each star
-  for (i = 0; i < NUMBER_OF_STARS; i++) {
-    fprintf(file, "%f, %f, %f, %f, %f, %f\n", (galaxy[i])->x_pos, (galaxy[i])->y_pos, (galaxy[i])->z_pos, (galaxy[i])->x_v, (galaxy[i])->y_v, (galaxy[i])->z_v);
+  for (i = 0; i <numStars; i++) {
+    offset = getMyRank() * line_length * numStars + i;
+    
+    sprintf(buf, "%f,%f,%f,%f,%f,%f\n", (galaxy[i])->x_pos, (galaxy[i])->y_pos, (galaxy[i])->z_pos, (galaxy[i])->x_v, (galaxy[i])->y_v, (galaxy[i])->z_v);
+    
+    MPI_File_write_at(file, offset, buf, line_length, MPI_CHAR, &status);
   }
 
-  // close file
-  fclose(file);
-
+  // close file 
+  MPI_File_close(&file);
+  
   return 0;
 }
 
