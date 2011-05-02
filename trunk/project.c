@@ -139,3 +139,21 @@ void update_galaxy()
 	old = new;
 	memset(old, 0, sizeof(old));
 }
+
+
+/**
+ * Returns the value of my_size
+ */
+int getMySize()
+{
+	return my_size;
+}
+
+
+/**
+ * Returns the value of my_size
+ */
+int getMyRank()
+{
+	return my_rank;
+}
