@@ -1,8 +1,6 @@
 /*
  * GalaxySim
- * Copyright (c) 2011 Cody Garges <gargec@rpi.edu>
- *                    James McAtamney <mcataj@cs.rpi.edu>
- *                    Amanda Olyha <olyhaa@rpi.edu>
+ * Copyright (c) 2011 Cody Garges <gargec@rpi.edu>, James McAtamney <mcataj@cs.rpi.edu>, Amanda Olyha <olyhaa@rpi.edu>
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"),
  * to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
@@ -51,6 +49,8 @@ typedef struct
 /********** Variable Declarations **********/
 
 double closest_cluster_stars[NUMBER_OF_STARS/STARS_IN_CLUSTER][STARS_IN_CLUSTER];  //Keeps track of star indices for faster cluster computation
+star* galaxy[NUMBER_OF_STARS];
+star* new_galaxy[NUMBER_OF_STARS];
 
 /********** Function Headers **********/
 
@@ -60,6 +60,8 @@ int* get_stars_within_range(int origin);
 int* get_closest_stars(int origin);
 void apply_gravitation(int origin);
 star* force_of_gravity(int self_index, int other_index);
+star* get_star(int index);
+void set_star(int index, star* self);
 
 /********** Function Declarations **********/
 
@@ -206,6 +208,26 @@ star* force_of_gravity(int self_index, int other_index)
 	storage->y_acc = force * (other->y_pos - self->y_pos);
 	storage->z_acc = force * (other->z_pos - self->z_pos);
 	return storage;
+}
+
+/**
+ * Return the star at a given index in the array of stars
+ * 
+ * INPUT: index of desired star
+ */
+star* get_star(int index)
+{
+	return galaxy[index];
+}
+
+/**
+ * Set the star at index to new value
+ * 
+ * INPUT: index of desired star, desired star
+ */
+void set_star(int index, star* self)
+{
+	new_galaxy[index] = self;
 }
 
 #endif
