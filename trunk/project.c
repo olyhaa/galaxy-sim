@@ -1,8 +1,6 @@
 /*
  * GalaxySim
- * Copyright (c) 2011 Cody Garges <gargec@rpi.edu>
- *										James McAtamney <mcataj@cs.rpi.edu>
- *										Amanda Olyha <olyhaa@rpi.edu>
+ * Copyright (c) 2011 Cody Garges <gargec@rpi.edu>, James McAtamney <mcataj@cs.rpi.edu>, Amanda Olyha <olyhaa@rpi.edu>
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"),
  * to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
@@ -15,6 +13,9 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER 
  * DEALINGS IN THE SOFTWARE.
  */
+
+#ifndef GALAXY_SIM_PROJECT_C
+#define GALAXY_SIM_PROJECT_C
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -35,15 +36,12 @@
 int my_rank;
 int my_size;
 MPI_Status status;
-star* galaxy[NUMBER_OF_STARS];
 star* new_galaxy[NUMBER_OF_STARS];
-
 
 /********** Function Headers **********/
 
 void initialize();
-star* get_star(int index);
-void set_star(int index, star* self);
+void update_galaxy();
 
 /********** Function Declarations **********/
 
@@ -110,26 +108,6 @@ void initialize()
 }
 
 /**
- * Return the star at a given index in the array of stars
- * 
- * INPUT: index of desired star
- */
-star* get_star(int index)
-{
-	return galaxy[index];
-}
-
-/**
- * Set the star at index to new value
- * 
- * INPUT: index of desired star, desired star
- */
-void set_star(int index, star* self)
-{
-	new_galaxy[index] = self;
-}
-
-/**
  * Set the state of the galaxy (galaxy) to the new state after computation (new galaxy)
  */
 void update_galaxy()
@@ -139,7 +117,6 @@ void update_galaxy()
 	old = new;
 	memset(old, 0, sizeof(old));
 }
-
 
 /**
  * Returns the value of my_size
@@ -157,3 +134,5 @@ int getMyRank()
 {
 	return my_rank;
 }
+
+#endif
