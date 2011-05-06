@@ -152,10 +152,13 @@ star* apply_gravitation(star* self, star** galaxy)
 	int x;
 	for(x = 0; x < NUMBER_OF_STARS; x++)
 	{
-		star* temp = force_of_gravity(self,galaxy[x]);
-		other->x_acc += temp->x_acc;
-		other->y_acc += temp->y_acc;
-		other->z_acc += temp->z_acc;
+		if(self != galaxy[x])
+		{
+			star* temp = force_of_gravity(self,galaxy[x]);
+			other->x_acc += temp->x_acc;
+			other->y_acc += temp->y_acc;
+			other->z_acc += temp->z_acc;
+		}
 	}
 	return other;
 }
