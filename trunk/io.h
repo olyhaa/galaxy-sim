@@ -40,7 +40,7 @@ int printStarInfo(char* fileName);
  * INPUTS: char* file name
  * OUTPUT: none
  */
-void getStarInfo(char* fileName) { //, star*** galaxy) {
+void getStarInfo(char* fileName) {
   MPI_File file;
   int my_rank, my_size, i, offset, numStars;
   int line_length = 133; // 18 chars per field, 7 fields, 6 separating commas, 1 newline
@@ -57,19 +57,15 @@ void getStarInfo(char* fileName) { //, star*** galaxy) {
     exit(1);
   }
 
-  printf("%d: Opened file: %s.\n", my_rank, fileName);
+  if (my_rank == 0)
+    printf("%d: Opened file: %s.\n", my_rank, fileName);
 
   // get the number of stars
-  if (my_rank == 0) {
-    MPI_File_read_at(file, 0, buf, 12, MPI_CHAR, &status);
-    sscanf(buf, "%012ld", &NUMBER_OF_STARS);      
-    
-    if (NUMBER_OF_STARS % my_size != 0)
-      NUMBER_OF_STARS -= NUMBER_OF_STARS % my_size;
+  MPI_File_read_at(file, 0, buf, 12, MPI_CHAR, &status);
+  sscanf(buf, "%012ld", &NUMBER_OF_STARS);      
   
-    galaxy = (star**) malloc(NUMBER_OF_STARS * sizeof(star*));
-    new_galaxy = (star**) malloc(NUMBER_OF_STARS * sizeof(star*));
-  }
+  if (NUMBER_OF_STARS % my_size != 0)
+    NUMBER_OF_STARS -= NUMBER_OF_STARS % my_size;
 
   // barrier - to make sure NUMBER_OF_STARS has been set before continuing
   if (MPI_Barrier(MPI_COMM_WORLD) != MPI_SUCCESS) {
@@ -77,11 +73,15 @@ void getStarInfo(char* fileName) { //, star*** galaxy) {
     exit(1);
   }
 
-  printf("%d: We have %ld stars.\n",  my_rank, NUMBER_OF_STARS);
-
   numStars = NUMBER_OF_STARS / my_size;
 
-  for (i = my_rank * numStars; i < (my_rank+1)*numStars; i++) {
+  if (my_rank == 0)
+    printf("%d: We have %ld stars, each processor has %d stars.\n",  my_rank, NUMBER_OF_STARS, numStars);
+ 
+  galaxy = (star**) malloc(numStars * sizeof(star*));
+  new_galaxy = (star**) malloc(numStars * sizeof(star*));
+
+  for (i = 0; i < numStars; i++) {
     offset = my_rank * line_length * numStars + i * line_length + 13;
 
     MPI_File_read_at(file, offset, buf, line_length, MPI_CHAR, &status);
@@ -137,7 +137,7 @@ int printStarInfo(char* fileName) {
   }
 
   // loop through array and output state of each star
-  for (i = my_rank*numStars; i < (my_rank+1)*numStars; i++) {
+  for (i = 0; i < numStars; i++) {
     offset = my_rank * line_length * numStars + i * line_length + 13;
     
     sprintf(buf, "% 018lf,% 018lf,% 018lf,% 018lf,% 018lf,% 018lf,% 018lf\n", (galaxy[i])->x_pos, (galaxy[i])->y_pos, (galaxy[i])->z_pos, (galaxy[i])->x_v, (galaxy[i])->y_v, (galaxy[i])->z_v, (galaxy[i])->mass);
