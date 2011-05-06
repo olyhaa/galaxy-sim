@@ -33,6 +33,7 @@
 
 /********** Variable Declarations **********/
 
+double* galaxy = NULL;
 double* recv_array = NULL;
 int my_rank;
 int my_size;
@@ -80,7 +81,7 @@ int main(int argc, char* argv[])
 		num_stars = NUMBER_OF_STARS / my_size;
 
 		for (i = 0; i < num_stars; i++)
-			apply_gravitation(my_rank * num_stars + i);
+			perform_calculations();
 		
 		count++;
 
@@ -115,6 +116,7 @@ void initialize(char* fileName)
 	MPI_Type_commit(&MPI_STAR);
 	getStarInfo(fileName);
 	num_stars = NUMBER_OF_STARS/my_size;
+	galaxy = malloc(num_stars * sizeof(double));
 	recv_array = malloc(num_stars * sizeof(double));
 	stars = malloc(num_stars * sizeof(double));
 }
