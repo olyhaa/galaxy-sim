@@ -30,7 +30,6 @@
 
 void getStarInfo(char* fileName);
 int printStarInfo(char* fileName);
-void testFunct();
 
 /********** Function Declarations **********/
 
@@ -39,23 +38,26 @@ void testFunct();
  * put into an array of stars which is returned.
  *
  * INPUTS: char* file name
- *         int number of stars
- * OUTPUT: array of star*
+ * OUTPUT: none
  */
 void getStarInfo(char* fileName) { //, star*** galaxy) {
-
-  // get file, open it
   MPI_File file;
   int my_rank, my_size, i, offset, numStars;
   int line_length = 133; // 18 chars per field, 7 fields, 6 separating commas, 1 newline
+  double x_p, y_p, z_p, x_vl, y_vl, z_vl, m;
   char buf[1024];
   MPI_Status status;
-  double x_p, y_p, z_p, x_vl, y_vl, z_vl, m;
- 
+  
   MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
   MPI_Comm_size(MPI_COMM_WORLD, &my_size);
 
-  MPI_File_open(MPI_COMM_WORLD, fileName, MPI_MODE_RDONLY, MPI_INFO_NULL, &file);
+  // get file, open it
+  if (MPI_File_open(MPI_COMM_WORLD, fileName, MPI_MODE_RDONLY, MPI_INFO_NULL, &file) != MPI_SUCCESS) {
+    printf("%d: Error in opening file.\n", my_rank);
+    exit(1);
+  }
+
+  printf("%d: Opened file: %s.\n", my_rank, fileName);
 
   // get the number of stars
   if (my_rank == 0) {
@@ -74,6 +76,8 @@ void getStarInfo(char* fileName) { //, star*** galaxy) {
     printf("MPI_Barrier error in processor %d \n", my_rank);
     exit(1);
   }
+
+  printf("%d: We have %ld stars.\n",  my_rank, NUMBER_OF_STARS);
 
   numStars = NUMBER_OF_STARS / my_size;
 
@@ -100,13 +104,11 @@ void getStarInfo(char* fileName) { //, star*** galaxy) {
   MPI_File_close(&file);
 }
 
-/*
+/**
  * Goes through an array of stars and outputs their current state into
  * a file.
  *
  * INPUTS: char* file name
- *         star* array of stars
- *         int number of stars
  * OUTPUT: 1 = error in creating file
  *         0 = success
  */

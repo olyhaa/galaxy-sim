@@ -58,15 +58,13 @@ int main(int argc, char* argv[])
   MPI_Comm_size(MPI_COMM_WORLD, &my_size);
   
   // get filename from command line args
-  if (my_rank == 0) {
-    if (argc < 2) {
-      printf("USAGE: mpirun -np _ [filename] [DEBUG] \n");
-      exit(1);
-    } else { // get stars from file
-      initialize(argv[1]);
-    }
+  if (argc < 2) {
+    printf("USAGE: mpirun -np _ [filename] \n");
+    exit(1);
+  } else { // get stars from file
+    initialize(argv[1]);
   }
-
+ 
   while (count < MAX_COUNT) {   
     // sync up all processors
     if (MPI_Barrier(MPI_COMM_WORLD) != MPI_SUCCESS) {
