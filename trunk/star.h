@@ -20,37 +20,40 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include "mpi.h"
 
 typedef struct
 {
-	//Components of star position
-	double x_pos;
-	double y_pos;
-	double z_pos;
-	//Components of star velocity
-	double x_v;
-	double y_v;
-	double z_v;
-	//Mass of star -- currently all stars are assumed to have the same mass
-	double mass;
-	//Acceleration components -- used only for gravitational calculations, not otherwise accessed directly
-	double x_acc;
-	double y_acc;
-	double z_acc;
+  // Components of star position
+  double x_pos;
+  double y_pos;
+  double z_pos;
+  // Components of star velocity
+  double x_v;
+  double y_v;
+  double z_v;
+  // Mass of star -- currently all stars are assumed to have the same mass
+  double mass;
+  // Acceleration components 
+  // used only for gravitational calculations, not otherwise accessed directly
+  double x_acc;
+  double y_acc;
+  double z_acc;
 } star;
 
 /********** Variable Definitions **********/
 
-#define NUMBER_OF_STARS 10000      //The number of stars in the galaxy
-#define STARS_IN_CLUSTER 1         //See description of cluster() function
-#define UPDATE_INTERVAL 50         //Number of timesteps between updates of closest stars
-#define GRAVITATION_DISTANCE 300   //Only stars within this maximum distance (in parsecs) will be taken into account for gravitation
+#define STARS_IN_CLUSTER 1         // See description of cluster() function
+#define UPDATE_INTERVAL 50         // Number of timesteps between updates of closest stars
+#define GRAVITATION_DISTANCE 300   // Only stars within this maximum distance (in parsecs)
+                                   // will be taken into account for gravitation
 
 /********** Variable Declarations **********/
 
-double closest_cluster_stars[NUMBER_OF_STARS/STARS_IN_CLUSTER][STARS_IN_CLUSTER];  //Keeps track of star indices for faster cluster computation
-star* galaxy[NUMBER_OF_STARS];
-star* new_galaxy[NUMBER_OF_STARS];
+//double** closest_cluster_stars[NUMBER_OF_STARS/STARS_IN_CLUSTER][STARS_IN_CLUSTER];  //Keeps track of star indices for faster cluster computation
+star** galaxy;
+star** new_galaxy;
+long NUMBER_OF_STARS;      //The number of stars in the galaxy
 
 /********** Function Headers **********/
 
@@ -66,34 +69,37 @@ void set_star(int index, star* self);
 /********** Function Declarations **********/
 
 /**
- * Group the stars into clusters of CLUSTER_OF_STARS "virtual stars" to make calculations on the stars less memory-intensive when passing data around
- * via MPI.
+ * Group the stars into clusters of CLUSTER_OF_STARS "virtual 
+ * stars" to make calculations on the stars less memory-intensive 
+ * when passing data around via MPI.
  * 
  * INPUT: array of stars to be clustered
  * OUTPUT: star containing agreggate star cluster data
  */
 star* cluster(star* cluster_stars[])
 {
-	star* collective;
-	double sum_of_masses = 0.0;
-	double sum_of_x = 0.0;
-	double sum_of_y = 0.0;
-	double sum_of_z = 0.0;
-	int x;
-	for(x=0;x<STARS_IN_CLUSTER;x++)
-	{
-		sum_of_masses += cluster_stars[x]->mass;
-		sum_of_x += cluster_stars[x]->x_pos * cluster_stars[x]->mass;
-		sum_of_y += cluster_stars[x]->y_pos * cluster_stars[x]->mass;
-		sum_of_z += cluster_stars[x]->z_pos * cluster_stars[x]->mass;
-	}
-	sum_of_x /= sum_of_masses;
-	sum_of_y /= sum_of_masses;
-	sum_of_z /= sum_of_masses;
-	collective->x_pos = sum_of_x;
-	collective->y_pos = sum_of_y;
-	collective->z_pos = sum_of_z;
-	return collective;	
+  star* collective = (star*) malloc(sizeof(star));
+  double sum_of_masses = 0.0;
+  double sum_of_x = 0.0;
+  double sum_of_y = 0.0;
+  double sum_of_z = 0.0;
+  int x;
+
+  for(x=0;x<STARS_IN_CLUSTER;x++)
+    {
+      sum_of_masses += cluster_stars[x]->mass;
+      sum_of_x += cluster_stars[x]->x_pos * cluster_stars[x]->mass;
+      sum_of_y += cluster_stars[x]->y_pos * cluster_stars[x]->mass;
+      sum_of_z += cluster_stars[x]->z_pos * cluster_stars[x]->mass;
+    }
+  sum_of_x /= sum_of_masses;
+  sum_of_y /= sum_of_masses;
+  sum_of_z /= sum_of_masses;
+  collective->x_pos = sum_of_x;
+  collective->y_pos = sum_of_y;
+  collective->z_pos = sum_of_z;
+
+  return collective;	
 }
 
 /**
@@ -104,10 +110,11 @@ star* cluster(star* cluster_stars[])
  */
 double distance(int self_index, int other_index)
 {
-	star* self = (star*)get_star(self_index);
-	star* other = (star*)get_star(other_index);
-	double dist = pow(other->x_pos - self->x_pos,2) + pow(other->y_pos - self->y_pos,2) + pow(other->z_pos - self->z_pos,2);
-	return sqrt(dist);
+  star* self = (star*)get_star(self_index);
+  star* other = (star*)get_star(other_index);
+  
+  double dist = pow(other->x_pos - self->x_pos,2) + pow(other->y_pos - self->y_pos,2) + pow(other->z_pos - self->z_pos,2);
+  return sqrt(dist);
 }
 
 /**
@@ -118,24 +125,28 @@ double distance(int self_index, int other_index)
  */
 int* get_stars_within_range(int origin)
 {
-	int size = NUMBER_OF_STARS / 10;
-	int num_stars = 0;
-	int* list = (int*)malloc(sizeof(int) * size);
-	
-	int x;
-	for(x=0;x<NUMBER_OF_STARS;x++)
+  int size = NUMBER_OF_STARS / 10 + 1;
+  int num_stars = 0;
+  int my_rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+  
+  int* list = (int*)malloc(sizeof(int) * size);
+  int x;
+
+  for(x = 0; x < NUMBER_OF_STARS; x++)
+    {
+      if(x != origin && distance(origin,x) < GRAVITATION_DISTANCE)
 	{
-		if(x != origin && distance(origin,x) < GRAVITATION_DISTANCE)
-		{
-			list[num_stars++] = x;
-			if(num_stars >= size)  //Expand the array if necessary
-			{
-				size += 1;
-				list = (int*)realloc(list, sizeof(int) * size);
-			}
-		}
+	  list[num_stars++] = x;
+
+	  if(num_stars >= size)  //Expand the array if necessary
+	    {
+	      size += 10;
+	      list = (int*)realloc(list, sizeof(int) * size);
+	    }
 	}
-	return list;
+    }
+  return list;
 }
 
 /**
@@ -146,26 +157,27 @@ int* get_stars_within_range(int origin)
  */
 int* get_closest_stars(int origin)
 {
-	int* cluster = (int*)malloc(sizeof(int) * STARS_IN_CLUSTER);
-	int* list_of_stars = get_stars_within_range(origin);
-	int x,y;
-	int index = 0;
-	for(x=0;x<STARS_IN_CLUSTER;x++)
+  int* cluster = (int*)malloc(sizeof(int) * STARS_IN_CLUSTER);
+  int* list_of_stars = get_stars_within_range(origin);
+  int x,y;
+  int index = 0;
+
+  for(x=0;x<STARS_IN_CLUSTER;x++)
+    {
+      double min = 100000.0;
+      for(y=0;x<sizeof(list_of_stars)/sizeof(int);y++)  //Loop through the list of stars within range, finding the closest
 	{
-		double min = 100000.0;
-		for(y=0;x<sizeof(list_of_stars)/sizeof(int);y++)  //Loop through the list of stars within range, finding the closest
-		{
-			double dist = distance(origin,list_of_stars[y]);
-			if(list_of_stars[y] != -1 && dist < min)
-			{
-				min = dist;
-				index = y;
-			}
-		}
-		cluster[x] = list_of_stars[y];
-		list_of_stars[y] = -1;  //Once a closest star is found, set the index in the list to -1 so it isn't found again
+	  double dist = distance(origin,list_of_stars[y]);
+	  if(list_of_stars[y] != -1 && dist < min)
+	    {
+	      min = dist;
+	      index = y;
+	    }
 	}
-	return cluster;
+      cluster[x] = list_of_stars[y];
+      list_of_stars[y] = -1;  //Once a closest star is found, set the index in the list to -1 so it isn't found again
+    }
+  return cluster;
 }
 
 /**
@@ -175,18 +187,21 @@ int* get_closest_stars(int origin)
  */
 void apply_gravitation(int origin)
 {
-	int* other_stars = get_stars_within_range(origin);
-	int x;
-	star* self = (star*)get_star(origin);
-	self->x_acc = self->y_acc = self->z_acc = 0.0;
-	for(x=0;x<sizeof(other_stars)/sizeof(int);x++)
-	{
-		star* temp = force_of_gravity(origin,x);
-		self->x_acc += temp->x_acc;
-		self->y_acc += temp->y_acc;
-		self->z_acc += temp->z_acc;
-	}
-	set_star(origin, self);
+  int* other_stars = get_stars_within_range(origin);
+  int x;
+  star* self = (star*)get_star(origin);
+  
+  self->x_acc = self->y_acc = self->z_acc = 0.0;
+  
+  int num = sizeof(other_stars)/sizeof(int);
+  for(x = 0; x < num; x++)
+    {
+      star* temp = force_of_gravity(origin,x);
+      self->x_acc += temp->x_acc;
+      self->y_acc += temp->y_acc;
+      self->z_acc += temp->z_acc;
+    }
+  set_star(origin, self);
 }
 
 /**
@@ -197,17 +212,17 @@ void apply_gravitation(int origin)
  */
 star* force_of_gravity(int self_index, int other_index)
 {
-	double G = 4.49734287 * pow(10.0,-9);  //Gravitational constant, using units of parsecs * (solar mass units)^-1 * (parsecs/millennium)^2
-	star* self = (star*)get_star(self_index);
-	star* other = (star*)get_star(other_index);
-	star* storage;
-	double r = distance(self_index, other_index);
-	double force = G * self->mass * other->mass;
-	force /= pow(r,3);
-	storage->x_acc = force * (other->x_pos - self->x_pos);
-	storage->y_acc = force * (other->y_pos - self->y_pos);
-	storage->z_acc = force * (other->z_pos - self->z_pos);
-	return storage;
+  double G = 4.49734287 * pow(10.0,-9);  //Gravitational constant, using units of parsecs * (solar mass units)^-1 * (parsecs/millennium)^2
+  star* self = (star*)get_star(self_index);
+  star* other = (star*)get_star(other_index);
+  star* storage = (star*) malloc(sizeof(star));
+  double r = distance(self_index, other_index);
+  double force = G * self->mass * other->mass;
+  force /= pow(r,3);
+  storage->x_acc = force * (other->x_pos - self->x_pos);
+  storage->y_acc = force * (other->y_pos - self->y_pos);
+  storage->z_acc = force * (other->z_pos - self->z_pos);
+  return storage;
 }
 
 /**
@@ -217,7 +232,9 @@ star* force_of_gravity(int self_index, int other_index)
  */
 star* get_star(int index)
 {
-	return galaxy[index];
+  star* ret = (star*)(galaxy[index]);
+  
+  return ret;
 }
 
 /**
@@ -227,7 +244,7 @@ star* get_star(int index)
  */
 void set_star(int index, star* self)
 {
-	new_galaxy[index] = self;
+  new_galaxy[index] = self;
 }
 
 #endif

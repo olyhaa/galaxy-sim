@@ -20,23 +20,19 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
-#include <mpi.h>
 #include <string.h>
+#include "mpi.h"
 #include "star.h"
 #include "io.h"
 #include "timing.h"
 
 /********** Variable Definitions **********/
 
-#define OUTPUT_INTERVAL 100	// Number of timesteps between each output of the current simulation state
-#define MAX_COUNT 50000000	 // maximum number of iterations
+#define OUTPUT_INTERVAL 100	// Number of timesteps between each 
+                                // output of the current simulation state
+#define MAX_COUNT 500	// maximum number of iterations
 
 /********** Variable Declarations **********/
-
-int my_rank;
-int my_size;
-MPI_Status status;
-star* new_galaxy[NUMBER_OF_STARS];
 
 /********** Function Headers **********/
 
@@ -47,64 +43,68 @@ void update_galaxy();
 
 int main(int argc, char* argv[])
 {
-	// initialize MPI environment
-	if (MPI_Init(&argc, &argv) != MPI_SUCCESS) {
-		printf("MPI intialization failed.\n");
-		exit(1);
-	}
+  int my_rank, my_size;
+  int count = 0, i, num_stars;
+  char str[100], cstr[100];
 
-	// get number of processors, current rank
-	MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-	MPI_Comm_size(MPI_COMM_WORLD, &my_size);
+  // initialize MPI environment
+  if (MPI_Init(&argc, &argv) != MPI_SUCCESS) {
+    printf("MPI intialization failed.\n");
+    exit(1);
+  }
+  
+  // get number of processors, current rank
+  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &my_size);
+  
+  // get filename from command line args
+  if (my_rank == 0) {
+    if (argc < 2) {
+      printf("USAGE: mpirun -np _ [filename] [DEBUG] \n");
+      exit(1);
+    } else { // get stars from file
+      initialize(argv[1]);
+    }
+  }
 
-	// make sure the number of processors is valid
-	if (NUMBER_OF_STARS % my_size != 0) {
-		printf("The number of stars must be divisible by the processor world size.\n");
-		exit(1);
-	}
+  while (count < MAX_COUNT) {   
+    // sync up all processors
+    if (MPI_Barrier(MPI_COMM_WORLD) != MPI_SUCCESS) {
+      printf("MPI_Barrier error in processor %d \n", my_rank);
+      exit(1);
+    }
 
-	// read in stars from file
-	if (my_rank == 0)
-		initialize();
+    // calculate new positions, update star array
+    num_stars = NUMBER_OF_STARS / my_size;
 
-	int count = 0;
-	while (count < MAX_COUNT) {
+    for (i = 0; i < num_stars; i++)
+      apply_gravitation(my_rank * num_stars + i);
+    
+    count++;
 
-		// sync up all processors
-		if (MPI_Barrier(MPI_COMM_WORLD) != MPI_SUCCESS) {
-			printf("MPI_Barrier error in processor %d \n", my_rank);
-			exit(1);
-		}
-		int i;
-		// calculate new positions, update star array
-		for (i = 0; i < NUMBER_OF_STARS / my_size; i++)
-			apply_gravitation(my_rank * my_size + i);
-	 
-		count++;
-		
-		// print out state if needed
-		if ((my_rank == 0) && (count % UPDATE_INTERVAL == 0)) {
-		        char str[100], cstr[100];
-			strcpy(str, "outFile");
-			sprintf(cstr, "%d", count);
-			strcat(str, cstr);
-			strcat(str, ".dat");
-			printStarInfo(str, galaxy);
-		}
-	}
-
-	MPI_Finalize();
-
-	return 0;
+    // print out state if needed
+    if ((my_rank == 0) && (count % OUTPUT_INTERVAL == 0)) {
+      printf("%d: Printing out status at interval %d.\n", my_rank, count);
+      strcpy(str, "./states/outFile");
+      sprintf(cstr, "%d", count);
+      strcat(str, cstr);
+      strcat(str, ".txt");
+      printStarInfo(str);
+    }
+  }
+  
+  MPI_Finalize();
+  
+  return 0;
 }
 
 /**
  * Call helper functions to load the data, create the array,
  * and otherwise set up the program's initial conditions.
  */
-void initialize() 
+void initialize(char* fileName) 
 {
-	getStarInfo("initialStarConfig.dat", galaxy);
+  getStarInfo(fileName);
 }
 
 /**
@@ -112,27 +112,12 @@ void initialize()
  */
 void update_galaxy()
 {
-	star** old = galaxy;
-	star** new = new_galaxy;
-	old = new;
-	memset(old, 0, sizeof(old));
-}
+  star** old = galaxy;
+  galaxy = new_galaxy;
 
-/**
- * Returns the value of my_size
- */
-int getMySize()
-{
-	return my_size;
-}
+  new_galaxy = old;
 
-
-/**
- * Returns the value of my_size
- */
-int getMyRank()
-{
-	return my_rank;
+  memset(new_galaxy, 0, sizeof(old));
 }
 
 #endif
