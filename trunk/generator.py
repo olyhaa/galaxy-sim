@@ -137,19 +137,19 @@ for i in range(int(n)):
     
     #rt.append((x[-1]**2+y[-1]**2+z[-1]**2)**0.5)
  
-plt.figure()
-plt.hist(xv,100)
-plt.title('dx')
-plt.figure()
-plt.hist(yv,100)
-plt.title('dy')
-plt.figure()
-plt.plot(rt,valt,'.k')
-plt.title('Val')
+#plt.figure()
+#plt.hist(xv,100)
+#plt.title('dx')
+#plt.figure()
+#plt.hist(yv,100)
+#plt.title('dy')
+#plt.figure()
+#plt.plot(rt,valt,'.k')
+#plt.title('Val')
 
 ##Create Bulge;  30 Million Stars Compared to 200 Billion in Disk 
 n_c=len(x)*0.015
-print n_c
+#print n_c
 for i in range(int(n_c)):
   r=4200*random.power(3)
   theta=random.random()*pi
@@ -183,7 +183,7 @@ if len(x)%2==1:
   yv.pop()
   zv.pop()
 out=open('out.txt','w')
-out.write('% 012'len(x))
+out.write('%012d'%len(x)+'\n')
 for i in range(len(x)):
   out.write('% 018.9f'%x[i]+',''% 018.9f'%y[i]+','+'% 018.9f'%z[i]+','+'% 018.9f'%xv[i]+','+'% 018.9f'%yv[i]+','+'% 018.9f'%zv[i]+',''% 018.9f'%1+'\n')
 
@@ -191,12 +191,43 @@ out.close()
 #plt.figure()
 #plt.plot(rt,sp,'.k')
 
+
+
 maxval=max(x)*0.8
+maxval_r=(maxval/0.8)*1.5
+maxval2=(maxval_r)**2
+xdark=[]
+ydark=[]
+zdark=[]
+#Create Dark Matter Halo
+for i in arange(-maxval_r,maxval_r,maxval_r/(2**4)):
+  for j in arange(-maxval_r,maxval_r,maxval_r/(2**4)):
+    for k in arange(-maxval_r,maxval_r,maxval_r/(2**4)):
+      if (i**2+j**2+k**2)<maxval2:
+        xdark.append(i)
+        ydark.append(j)
+        zdark.append(k)
+
+out=open('out_dark.txt','w')
+
+for i in range(len(x)):
+  out.write('% 018.9f'%xdark[i]+',''% 018.9f'%ydark[i]+','+'% 018.9f'%zdark[i]+'\n')
+
+out.close()
+
+
+
+
+#print len(xdark)
+#print len(ydark)
+#print len(zdark)
+#maxval=max(x)*0.8
 fig=plt.figure() 
 ax = p3.Axes3D(fig)  
 ax.plot3D(x,y,z,'.y')
-ax.set_xlim3d(-maxval,maxval)
-ax.set_ylim3d(-maxval,maxval)
-ax.set_zlim3d(-maxval,maxval)
+ax.plot3D(xdark,ydark,zdark,'.k')
+ax.set_xlim3d(-maxval_r,maxval_r)
+ax.set_ylim3d(-maxval_r,maxval_r)
+ax.set_zlim3d(-maxval_r,maxval_r)
 print len(x)
 plt.show()
