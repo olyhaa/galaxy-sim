@@ -45,8 +45,6 @@ typedef struct
 
 #define STARS_IN_CLUSTER 1         // See description of cluster() function
 #define UPDATE_INTERVAL 50         // Number of timesteps between updates of closest stars
-#define GRAVITATION_DISTANCE 300   // Only stars within this maximum distance (in parsecs)
-                                   // will be taken into account for gravitation
 
 /********** Variable Declarations **********/
 
@@ -59,8 +57,7 @@ long NUMBER_OF_STARS;      //The number of stars in the galaxy
 
 star* cluster(star* cluster_stars[]);
 double distance(int self_index, int other_index);
-int* get_stars_within_range(int origin);
-int* get_closest_stars(int origin);
+//int* get_closest_stars(int origin);
 void apply_gravitation(int origin);
 star* force_of_gravity(int self_index, int other_index);
 star* get_star(int index);
@@ -118,43 +115,12 @@ double distance(int self_index, int other_index)
 }
 
 /**
- * Determine which stars are within GRAVITATION_DISTANCE of the origin star
- * 
- * INPUT: the index of the origin star
- * OUTPUT: an array of the indices of the stars no farther than GRAVITATION_DISTANCE away
- */
-int* get_stars_within_range(int origin)
-{
-  int size = NUMBER_OF_STARS / 10 + 1;
-  int num_stars = 0;
-  int my_rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-  
-  int* list = (int*)malloc(sizeof(int) * size);
-  int x;
-
-  for(x = 0; x < NUMBER_OF_STARS; x++)
-    {
-      if(x != origin && distance(origin,x) < GRAVITATION_DISTANCE)
-	{
-	  list[num_stars++] = x;
-
-	  if(num_stars >= size)  //Expand the array if necessary
-	    {
-	      size += 10;
-	      list = (int*)realloc(list, sizeof(int) * size);
-	    }
-	}
-    }
-  return list;
-}
-
-/**
  * Determine the closest STARS_IN_CLUSTER stars to the origin star
  * 
  * INPUT: the index of the origin star
  * OUTPUT: an array of the indices of the STARS_IN_CLUSTER closest stars
  */
+/* Currently nonfunctional
 int* get_closest_stars(int origin)
 {
   int* cluster = (int*)malloc(sizeof(int) * STARS_IN_CLUSTER);
@@ -178,7 +144,7 @@ int* get_closest_stars(int origin)
       list_of_stars[y] = -1;  //Once a closest star is found, set the index in the list to -1 so it isn't found again
     }
   return cluster;
-}
+}*/
 
 /**
  * Apply the net gravitational force to the star
@@ -187,14 +153,11 @@ int* get_closest_stars(int origin)
  */
 void apply_gravitation(int origin)
 {
-  int* other_stars = get_stars_within_range(origin);
-  int x;
   star* self = (star*)get_star(origin);
-  
   self->x_acc = self->y_acc = self->z_acc = 0.0;
   
-  int num = sizeof(other_stars)/sizeof(int);
-  for(x = 0; x < num; x++)
+  int x;
+  for(x = 0; x < NUMBER_OF_STARS; x++)
     {
       star* temp = force_of_gravity(origin,x);
       self->x_acc += temp->x_acc;
