@@ -33,8 +33,8 @@
 
 /********** Variable Declarations **********/
 
-double* galaxy = NULL;
-double* recv_array = NULL;
+star* galaxy = NULL;
+star* recv_array = NULL;
 int my_rank;
 int my_size;
 int num_stars;
@@ -43,7 +43,8 @@ star** stars;
 /********** Function Headers **********/
 
 void initialize();
-void update_galaxy();
+star** do_gravitation(star* stars[], star* galaxy[]);
+void perform_calculations();
 
 /********** Function Declarations **********/
 
@@ -92,7 +93,7 @@ int main(int argc, char* argv[])
 			sprintf(cstr, "%d", count);
 			strcat(str, cstr);
 			strcat(str, ".txt");
-			printStarInfo(str);
+			printStarInfo(str, galaxy);
 		}
 	}
 	
@@ -114,14 +115,13 @@ void initialize(char* fileName)
 	MPI_Datatype MPI_STAR;
 	MPI_Type_create_struct(3, lengths, disp, types, &MPI_STAR);
 	MPI_Type_commit(&MPI_STAR);
-	getStarInfo(fileName);
-	num_stars = NUMBER_OF_STARS/my_size;
-	galaxy = malloc(num_stars * sizeof(double));
-	recv_array = malloc(num_stars * sizeof(double));
-	stars = malloc(num_stars * sizeof(double));
+	
+	galaxy = getStarInfo(fileName);
+	recv_array = malloc(num_stars * sizeof(star*));
+	stars = malloc(num_stars * sizeof(star*));
 }
 
-void do_gravitation(star* stars[], star* galaxy[])
+star** do_gravitation(star* stars[], star* galaxy[])
 {
 	int i;
 	star* temp;
@@ -132,6 +132,7 @@ void do_gravitation(star* stars[], star* galaxy[])
 		stars[i]->y_acc += temp->y_acc;
 		stars[i]->z_acc += temp->z_acc;
 	}
+	return stars;
 }
 
 void perform_calculations()
@@ -147,9 +148,9 @@ void perform_calculations()
 	}
 	//First, apply gravitation to our own portion of the galaxy
 	do_gravitation(stars, galaxy);
-	//Now send our part of the B matrix to processor my_rank+1, my_rank+2, ..., my_size-1, 0, 1, ..., my_rank-1 while receiving from the corresponding processors
+	//Now send our galaxy to processor my_rank+1, my_rank+2, ..., my_size-1, 0, 1, ..., my_rank-1 while receiving from the corresponding processors
 	//Send/Recv is reversed by even/odd processor number to avoid deadlocks
-	//Once a B matrix is received, do the necessary multiplication, then pass it along
+	//Once a galaxy is received, do the necessary calculations, then pass it along
 	for(k=0;k<my_size-1;k++)
 	{
 		if(my_rank%2 == 0)
@@ -168,6 +169,12 @@ void perform_calculations()
 		galaxy = recv_array;
 		recv_array = temp;
 		do_gravitation(stars, galaxy);
+	}
+	for (i=0;i<num_stars;i++)
+	{
+		galaxy[i]->x_acc = stars[i]->x_acc;
+		galaxy[i]->y_acc = stars[i]->y_acc;
+		galaxy[i]->z_acc = stars[i]->z_acc;
 	}
 }
 
