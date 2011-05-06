@@ -28,11 +28,16 @@
 
 /********** Variable Definitions **********/
 
-#define OUTPUT_INTERVAL 100	// Number of timesteps between each 
-                                // output of the current simulation state
+#define OUTPUT_INTERVAL 100	// Number of timesteps between each output of the current simulation state
 #define MAX_COUNT 500	// maximum number of iterations
 
 /********** Variable Declarations **********/
+
+double* recv_array = NULL;
+int my_rank;
+int my_size;
+int num_stars;
+star** stars;
 
 /********** Function Headers **********/
 
@@ -43,57 +48,56 @@ void update_galaxy();
 
 int main(int argc, char* argv[])
 {
-  int my_rank, my_size;
-  int count = 0, i, num_stars;
-  char str[100], cstr[100];
+	int count = 0, i, num_stars;
+	char str[100], cstr[100];
 
-  // initialize MPI environment
-  if (MPI_Init(&argc, &argv) != MPI_SUCCESS) {
-    printf("MPI intialization failed.\n");
-    exit(1);
-  }
-  
-  // get number of processors, current rank
-  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &my_size);
-  
-  // get filename from command line args
-  if (argc < 2) {
-    printf("USAGE: mpirun -np _ [filename] \n");
-    exit(1);
-  } else { // get stars from file
-    initialize(argv[1]);
-  }
+	// initialize MPI environment
+	if (MPI_Init(&argc, &argv) != MPI_SUCCESS) {
+		printf("MPI intialization failed.\n");
+		exit(1);
+	}
+	
+	// get number of processors, current rank
+	MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &my_size);
+	
+	// get filename from command line args
+	if (argc < 2) {
+		printf("USAGE: mpirun -np _ [filename] \n");
+		exit(1);
+	} else { // get stars from file
+		initialize(argv[1]);
+	}
  
-  while (count < MAX_COUNT) {   
-    // sync up all processors
-    if (MPI_Barrier(MPI_COMM_WORLD) != MPI_SUCCESS) {
-      printf("MPI_Barrier error in processor %d \n", my_rank);
-      exit(1);
-    }
+	while (count < MAX_COUNT) {
+		// sync up all processors
+		if (MPI_Barrier(MPI_COMM_WORLD) != MPI_SUCCESS) {
+			printf("MPI_Barrier error in processor %d \n", my_rank);
+			exit(1);
+		}
 
-    // calculate new positions, update star array
-    num_stars = NUMBER_OF_STARS / my_size;
+		// calculate new positions, update star array
+		num_stars = NUMBER_OF_STARS / my_size;
 
-    for (i = 0; i < num_stars; i++)
-      apply_gravitation(my_rank * num_stars + i);
-    
-    count++;
+		for (i = 0; i < num_stars; i++)
+			apply_gravitation(my_rank * num_stars + i);
+		
+		count++;
 
-    // print out state if needed
-    if ((my_rank == 0) && (count % OUTPUT_INTERVAL == 0)) {
-      printf("%d: Printing out status at interval %d.\n", my_rank, count);
-      strcpy(str, "./states/outFile");
-      sprintf(cstr, "%d", count);
-      strcat(str, cstr);
-      strcat(str, ".txt");
-      printStarInfo(str);
-    }
-  }
-  
-  MPI_Finalize();
-  
-  return 0;
+		// print out state if needed
+		if ((my_rank == 0) && (count % OUTPUT_INTERVAL == 0)) {
+			printf("%d: Printing out status at interval %d.\n", my_rank, count);
+			strcpy(str, "./states/outFile");
+			sprintf(cstr, "%d", count);
+			strcat(str, cstr);
+			strcat(str, ".txt");
+			printStarInfo(str);
+		}
+	}
+	
+	MPI_Finalize();
+	
+	return 0;
 }
 
 /**
@@ -102,20 +106,67 @@ int main(int argc, char* argv[])
  */
 void initialize(char* fileName) 
 {
-  getStarInfo(fileName);
+	int count = 10;
+	int lengths[3] = {1, 10, 1};
+	MPI_Aint disp = {0, 0, 40};
+	MPI_Datatype types[3] = {MPI_LB, MPI_DOUBLE, MPI_UB};
+	MPI_Datatype MPI_STAR;
+	MPI_Type_create_struct(3, lengths, disp, types, &MPI_STAR);
+	MPI_Type_commit(&MPI_STAR);
+	getStarInfo(fileName);
+	num_stars = NUMBER_OF_STARS/my_size;
+	recv_array = malloc(num_stars * sizeof(double));
+	stars = malloc(num_stars * sizeof(double));
 }
 
-/**
- * Set the state of the galaxy (galaxy) to the new state after computation (new galaxy)
- */
-void update_galaxy()
+void do_gravitation(star* stars[], star* galaxy[])
 {
-  star** old = galaxy;
-  galaxy = new_galaxy;
+	int i;
+	star* temp;
+	for (i=0;i<num_stars;i++)
+	{
+		temp = apply_gravitation(galaxy[i], galaxy);
+		stars[i]->x_acc += temp->x_acc;
+		stars[i]->y_acc += temp->y_acc;
+		stars[i]->z_acc += temp->z_acc;
+	}
+}
 
-  new_galaxy = old;
-
-  memset(new_galaxy, 0, sizeof(old));
+void perform_calculations()
+{
+	int i,k;
+	int tag = 0;
+	MPI_Request req[2];
+	for (i=0;i<num_stars;i++)
+	{
+		stars[i]->x_acc = 0.0;
+		stars[i]->y_acc = 0.0;
+		stars[i]->z_acc = 0.0;
+	}
+	//First, apply gravitation to our own portion of the galaxy
+	do_gravitation(stars, galaxy);
+	//Now send our part of the B matrix to processor my_rank+1, my_rank+2, ..., my_size-1, 0, 1, ..., my_rank-1 while receiving from the corresponding processors
+	//Send/Recv is reversed by even/odd processor number to avoid deadlocks
+	//Once a B matrix is received, do the necessary multiplication, then pass it along
+	for(k=0;k<my_size-1;k++)
+	{
+		if(my_rank%2 == 0)
+		{
+			MPI_Isend(&galaxy[0],num_stars,MPI_STAR,(my_rank+1)&(my_size-1),tag,MPI_COMM_WORLD,&req[0]);
+			MPI_Irecv(&recv_array[0],num_stars,MPI_STAR,(my_rank-1)&(my_size-1),tag,MPI_COMM_WORLD,&req[1]);
+		}
+		else
+		{
+			MPI_Irecv(&recv_array[0],num_stars,MPI_STAR,(my_rank-1)&(my_size-1),tag,MPI_COMM_WORLD,&req[1]);
+			MPI_Isend(&galaxy[0],num_stars,MPI_STAR,(my_rank+1)&(my_size-1),tag,MPI_COMM_WORLD,&req[0]);
+		}
+		MPI_Waitall(2,req,MPI_STATUSES_IGNORE);
+		//Swap galaxy and recv_array pointers, moving received data in recv_array to galaxy in preparation for calculations
+		star** temp = galaxy;
+		galaxy = recv_array;
+		recv_array = temp;
+		do_gravitation(stars, galaxy);
+	}
 }
 
 #endif
