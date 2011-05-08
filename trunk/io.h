@@ -42,14 +42,11 @@ int printStarInfo(char* fileName);
  */
 void getStarInfo(char* fileName) {
   MPI_File file;
-  int my_rank, my_size, i, offset, numStars;
+  int i, offset;
   int line_length = 133; // 18 chars per field, 7 fields, 6 separating commas, 1 newline
   double x_p, y_p, z_p, x_vl, y_vl, z_vl, m;
   char buf[1024];
   MPI_Status status;
-  
-  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &my_size);
 
   // get file, open it
   if (MPI_File_open(MPI_COMM_WORLD, fileName, MPI_MODE_RDONLY, MPI_INFO_NULL, &file) != MPI_SUCCESS) {
@@ -73,31 +70,32 @@ void getStarInfo(char* fileName) {
     exit(1);
   }
 
-  numStars = NUMBER_OF_STARS / my_size;
+  num_stars = NUMBER_OF_STARS / my_size;
 
   if (my_rank == 0)
-    printf("%d: We have %ld stars, each processor has %d stars.\n",  my_rank, NUMBER_OF_STARS, numStars);
+    printf("%d: We have %ld stars, each processor has %d stars.\n",  my_rank, NUMBER_OF_STARS, num_stars);
  
-  galaxy = (star**) malloc(numStars * sizeof(star*));
-  new_galaxy = (star**) malloc(numStars * sizeof(star*));
+  galaxy = (star*) malloc(num_stars * sizeof(star));
+  // malloc other arrays
+  recv_array = (star*) malloc(num_stars * sizeof(star));
+  stars = (star*) malloc(num_stars * sizeof(star));
 
-  for (i = 0; i < numStars; i++) {
-    offset = my_rank * line_length * numStars + i * line_length + 13;
+  
+  for (i = 0; i < num_stars; i++) {
+    offset = my_rank * line_length * num_stars + i * line_length + 13;
 
     MPI_File_read_at(file, offset, buf, line_length, MPI_CHAR, &status);
 
     sscanf(buf, "%lf,%lf,%lf,%lf,%lf,%lf,%lf\n", &x_p, &y_p, &z_p, &x_vl, &y_vl, &z_vl, &m);
 
-    galaxy[i] = (star*) malloc(sizeof(star));
-    new_galaxy[i] = (star*) malloc(sizeof(star));
-   
-    (galaxy[i])->x_pos = x_p;
-    (galaxy[i])->y_pos = y_p;
-    (galaxy[i])->z_pos = z_p;
-    (galaxy[i])->x_v = x_vl;
-    (galaxy[i])->y_v = y_vl;
-    (galaxy[i])->z_v = z_vl;
-    (galaxy[i])->mass = m; 
+    // malloc all galaxy arrays
+    (stars[i]).x_pos = (galaxy[i]).x_pos = x_p;
+    (stars[i]).y_pos = (galaxy[i]).y_pos = y_p;
+    (stars[i]).z_pos = (galaxy[i]).z_pos = z_p;
+    (stars[i]).x_v   = (galaxy[i]).x_v   = x_vl;
+    (stars[i]).y_v   = (galaxy[i]).y_v   = y_vl;
+    (stars[i]).z_v   = (galaxy[i]).z_v   = z_vl;
+    (stars[i]).mass  = (galaxy[i]).mass  = m; 
   }
   
   // close file
@@ -117,18 +115,16 @@ int printStarInfo(char* fileName) {
   // get file, open it
   MPI_File file;
   char buf[1024]; 
-  int my_rank, my_size, i, offset, numStars, line_length = 133;
+  int i, offset, line_length = 133;
   MPI_Status status;
-
-  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &my_size);
 
   if (MPI_File_open(MPI_COMM_WORLD, fileName, MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &file) != MPI_SUCCESS) {
     fprintf(stderr, "Cannot create %s.\n", fileName);
     exit(1);
   }
 
-  numStars = NUMBER_OF_STARS / my_size;
+  if (my_rank == 0)
+    printf("%d: Printing out to file: %s.\n", my_rank, fileName);
 
   // print out galaxy size
   if (my_rank == 0) {
@@ -137,10 +133,10 @@ int printStarInfo(char* fileName) {
   }
 
   // loop through array and output state of each star
-  for (i = 0; i < numStars; i++) {
-    offset = my_rank * line_length * numStars + i * line_length + 13;
+  for (i = 0; i < num_stars; i++) {
+    offset = my_rank * line_length * num_stars + i * line_length + 13;
     
-    sprintf(buf, "% 018lf,% 018lf,% 018lf,% 018lf,% 018lf,% 018lf,% 018lf\n", (galaxy[i])->x_pos, (galaxy[i])->y_pos, (galaxy[i])->z_pos, (galaxy[i])->x_v, (galaxy[i])->y_v, (galaxy[i])->z_v, (galaxy[i])->mass);
+    sprintf(buf, "% 018lf,% 018lf,% 018lf,% 018lf,% 018lf,% 018lf,% 018lf\n", stars[i].x_pos, stars[i].y_pos, stars[i].z_pos, stars[i].x_v, stars[i].y_v, stars[i].z_v, stars[i].mass);
     
     MPI_File_write_at(file, offset, buf, line_length, MPI_CHAR, &status);
   }
