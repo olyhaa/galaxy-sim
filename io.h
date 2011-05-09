@@ -21,24 +21,39 @@
 #include <stdlib.h>
 #include "star.h"
 #include "mpi.h"
+#include "timing.h"
 
 /********** Variable Definitions **********/
 
 /********** Variable Declarations **********/
+int io_count = 0;             
+int b_count = 0;
+int comp_count = 0;
+int msg_count = 0;
+double barrier_time = 0.0;      // Keeps track of all the time spent in barriers
+double computation_time = 0.0;  // Keeps track of all the time spent in computation
+double message_time = 0.0;      // Keeps track of all the time spent in message passing
+
 
 /********** Function Headers **********/
 
 void getStarInfo(char* fileName);
 int printStarInfo(char* fileName);
+void printTimingResults();
 
 /********** Function Declarations **********/
 
 /**
  * Parses through input file to retrieve all star info.  All information is
- * put into an array of stars which is returned.
+ * put into an array of stars - stars and galaxy.
+ *
+ * stars holds the stars tied to this processor
+ * galaxy holds the current stars (at the start, stars and galaxy will be the same)
  *
  * INPUTS: char* file name
  * OUTPUT: none
+ *
+ * Times are printed to timing_io_results.txt.
  */
 void getStarInfo(char* fileName) {
   MPI_File file;
@@ -47,6 +62,7 @@ void getStarInfo(char* fileName) {
   double x_p, y_p, z_p, x_vl, y_vl, z_vl, m;
   char buf[1024];
   MPI_Status status;
+  unsigned long long start, end;
 
   // get file, open it
   if (MPI_File_open(MPI_COMM_WORLD, fileName, MPI_MODE_RDONLY, MPI_INFO_NULL, &file) != MPI_SUCCESS) {
@@ -54,16 +70,16 @@ void getStarInfo(char* fileName) {
     exit(1);
   }
 
-  if (my_rank == 0)
+  if (my_rank == 0) 
     printf("%d: Opened file: %s.\n", my_rank, fileName);
-
+      
   // get the number of stars
   MPI_File_read_at(file, 0, buf, 12, MPI_CHAR, &status);
   sscanf(buf, "%012ld", &NUMBER_OF_STARS);      
   
   if (NUMBER_OF_STARS % my_size != 0)
-    NUMBER_OF_STARS -= NUMBER_OF_STARS % my_size;
-
+      NUMBER_OF_STARS -= NUMBER_OF_STARS % my_size;
+  
   // barrier - to make sure NUMBER_OF_STARS has been set before continuing
   if (MPI_Barrier(MPI_COMM_WORLD) != MPI_SUCCESS) {
     printf("MPI_Barrier error in processor %d \n", my_rank);
@@ -76,11 +92,10 @@ void getStarInfo(char* fileName) {
     printf("%d: We have %ld stars, each processor has %d stars.\n",  my_rank, NUMBER_OF_STARS, num_stars);
  
   galaxy = (star*) malloc(num_stars * sizeof(star));
-  // malloc other arrays
   recv_array = (star*) malloc(num_stars * sizeof(star));
   stars = (star*) malloc(num_stars * sizeof(star));
 
-  
+  start = rdtsc();
   for (i = 0; i < num_stars; i++) {
     offset = my_rank * line_length * num_stars + i * line_length + 13;
 
@@ -97,14 +112,32 @@ void getStarInfo(char* fileName) {
     (stars[i]).z_v   = (galaxy[i]).z_v   = z_vl;
     (stars[i]).mass  = (galaxy[i]).mass  = m; 
   }
+  end = rdtsc();
   
   // close file
   MPI_File_close(&file);
+  
+  // write out timing results
+  if (MPI_File_open(MPI_COMM_WORLD, "timing_io_results.txt", MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, &file) != MPI_SUCCESS) {
+    printf("%d: Error in opening file.\n", my_rank);
+    exit(1);
+  }
+
+  offset = io_count * my_size * 20 + my_rank * 20;
+  
+  sprintf(buf, "%04d,%014.9lf\n", my_rank, ((double)(end-start))/CLOCK_RATE_BGL);
+  
+  MPI_File_write_at(file, offset, buf, 20, MPI_CHAR, &status);
+  
+  // close file
+  MPI_File_close(&file);
+  
+  io_count++;
 }
 
 /**
  * Goes through an array of stars and outputs their current state into
- * a file.
+ * a file.  Times are printed to timing_results.txt.
  *
  * INPUTS: char* file name
  * OUTPUT: 1 = error in creating file
@@ -117,6 +150,7 @@ int printStarInfo(char* fileName) {
   char buf[1024]; 
   int i, offset, line_length = 133;
   MPI_Status status;
+  unsigned long long start, end;
 
   if (MPI_File_open(MPI_COMM_WORLD, fileName, MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &file) != MPI_SUCCESS) {
     fprintf(stderr, "Cannot create %s.\n", fileName);
@@ -126,6 +160,7 @@ int printStarInfo(char* fileName) {
   if (my_rank == 0)
     printf("%d: Printing out to file: %s.\n", my_rank, fileName);
 
+  start = rdtsc();
   // print out galaxy size
   if (my_rank == 0) {
     sprintf(buf, "%012ld\n", NUMBER_OF_STARS);      
@@ -140,11 +175,93 @@ int printStarInfo(char* fileName) {
     
     MPI_File_write_at(file, offset, buf, line_length, MPI_CHAR, &status);
   }
+  end = rdtsc();
 
   // close file 
   MPI_File_close(&file);
+
+  
+  // write out timing results
+  if (MPI_File_open(MPI_COMM_WORLD, "timing_io_results.txt", MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, &file) != MPI_SUCCESS) {
+    printf("%d: Error in opening file.\n", my_rank);
+    exit(1);
+  }
+
+  offset = io_count * my_size * 20 + my_rank * 20;
+  
+  sprintf(buf, "%04d,%014.9lf\n", my_rank, ((double)(end-start))/CLOCK_RATE_BGL);
+
+  MPI_File_write_at(file, offset, buf, 20, MPI_CHAR, &status);
+  
+  // close file
+  MPI_File_close(&file);
+
+  io_count++;
   
   return 0;
 }
+/**
+ * Prints barrier, computation, and message results to file (per processor)
+ */
+void printTimingResults() 
+{
+  int offset;
+  char buf[100];
+  MPI_File file;
+  MPI_Status status;
 
+  // BARRIER
+  if (MPI_File_open(MPI_COMM_WORLD, "barrier_results.txt", MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, &file) != MPI_SUCCESS) {
+    printf("%d: Error in opening barrier file.\n", my_rank);
+    exit(1);
+  }
+
+  offset = b_count * my_size * 20 + my_rank * 20;
+  
+  sprintf(buf, "%04d,%014.9lf\n", my_rank, barrier_time);
+
+  MPI_File_write_at(file, offset, buf, 20, MPI_CHAR, &status);
+  
+  // close file
+  MPI_File_close(&file);
+
+  b_count++;
+
+  // COMPUTATION
+  if (MPI_File_open(MPI_COMM_WORLD, "computation_results.txt", MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, &file) != MPI_SUCCESS) {
+    printf("%d: Error in opening computation file.\n", my_rank);
+    exit(1);
+  }
+
+  offset = b_count * my_size * 20 + my_rank * 20;
+  
+  sprintf(buf, "%04d,%014.9lf\n", my_rank, computation_time);
+
+  MPI_File_write_at(file, offset, buf, 20, MPI_CHAR, &status);
+  
+  // close file
+  MPI_File_close(&file);
+
+  comp_count++;
+
+
+  // MESSAGE
+  if (MPI_File_open(MPI_COMM_WORLD, "message_results.txt", MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, &file) != MPI_SUCCESS) {
+    printf("%d: Error in opening file.\n", my_rank);
+    exit(1);
+  }
+
+  offset = b_count * my_size * 20 + my_rank * 20;
+  
+  sprintf(buf, "%04d,%014.9lf\n", my_rank, message_time);
+
+  MPI_File_write_at(file, offset, buf, 20, MPI_CHAR, &status);
+  
+  // close file
+  MPI_File_close(&file);
+
+  msg_count++;
+
+
+}
 #endif

@@ -64,7 +64,7 @@ double distance(star self, star other);
 //int* get_closest_stars(int origin);
 //star* apply_gravitation(star* self, star** galaxy);
 void apply_gravitation(int i);
-star force_of_gravity(star self, star other);
+void force_of_gravity(int self, star other);
 int equal(star first, star second);
 
 /********** Function Declarations **********/
@@ -152,45 +152,39 @@ int* get_closest_stars(int origin)
  * 
  * INPUT: the index of the star under consideration
  */
- //star* apply_gravitation(star* self, star** other_galaxy)
 void apply_gravitation(int i) 
 {
-  star temp;
-	
-	int x;
+        int x;
 	for(x = 0; x < num_stars; x++)
 	{
 	  if(equal(stars[i], galaxy[x]) == 0)
-		{
-			temp = force_of_gravity(stars[i],galaxy[x]);
-			stars[i].x_acc += temp.x_acc;
-			stars[i].y_acc += temp.y_acc;
-			stars[i].z_acc += temp.z_acc;
-		}
+	    {
+	      force_of_gravity(i,galaxy[x]);
+	    }
 	}
 }
 
 /**
- * Determine the magnitude of the gravitational force of one star on another
+ * Determine the magnitude of the gravitational force of one star (other) on stars[self]. 
  * 
- * INPUT: the indices of the two stars under consideration
- * OUTPUT: a "dummy" star holding the resulting acceleration data
+ * INPUT: the index of the star under consideration, the star of the oustide force
  */
-star force_of_gravity(star self, star other)
+void force_of_gravity(int self, star other)
 {
-        double G = 4.49734287 * pow(10.0,-9);	//Gravitational constant, using units of parsecs * (solar mass units)^-1 * (parsecs/millennium)^2
-	star storage;
-	double r = distance(self, other);
-	double force = G * self.mass * other.mass;
+        double G = 4.49734287 * pow(10.0,-9);	// Gravitational constant, using units of parsecs * (solar mass units)^-1 * (parsecs/millennium)^2
+	double r = distance(stars[self], other);
+	double force = G * stars[self].mass * other.mass;
 
 	force /= pow(r,3);
-	storage.x_acc = force * (other.x_pos - self.x_pos);
-	storage.y_acc = force * (other.y_pos - self.y_pos);
-	storage.z_acc = force * (other.z_pos - self.z_pos);
 
-	return storage;
+	stars[self].x_acc += force * (other.x_pos - stars[self].x_pos);
+	stars[self].y_acc += force * (other.y_pos - stars[self].y_pos);
+	stars[self].z_acc += force * (other.z_pos - stars[self].z_pos);
 }
 
+/**
+ * An equals function used in apply_gravitation to reduce computation
+ */
 int equal(star first, star second) 
 {
   if (first.x_pos == second.x_pos && first.y_pos == second.y_pos && first.z_pos == second.z_pos 
