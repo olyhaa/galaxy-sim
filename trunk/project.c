@@ -28,9 +28,10 @@
 
 /********** Variable Definitions **********/
 
-#define OUTPUT_INTERVAL 1000	// Number of timesteps between each output of the current simulation state
-#define MAX_COUNT 5000	        // maximum number of iterations
-#define PRINTOUT_INTERVAL 100 
+#define OUTPUT_INTERVAL 1000	// Number of timesteps between each output to file
+#define MAX_COUNT 5000	        // Maximum number of iterations
+#define PRINTOUT_INTERVAL 100   // Number of timesteps between each output to screen
+#define TIMING_INTERVAL 500     // Number of timesteps between each timing dump
 
 /********** Variable Declarations **********/
 MPI_Datatype MPI_STAR;
@@ -43,10 +44,16 @@ void perform_calculations();
 
 /********** Function Declarations **********/
 
+/**
+ * Initializes MPI environment.  Determines comm size and rank.  Provides
+ * the loop for each timestep.  Prints to screen and to file as specified in
+ * OUTOUT_INTERVAL and PRINTOUT_INTERVAL.
+ */
 int main(int argc, char* argv[])
 {
 	int count = 0;
 	char str[100], cstr[100];
+	unsigned long long start, end;
 
 	// initialize MPI environment
 	if (MPI_Init(&argc, &argv) != MPI_SUCCESS) {
@@ -67,14 +74,19 @@ int main(int argc, char* argv[])
 	}
  
 	while (count < MAX_COUNT) {
+	        start = rdtsc();
 		// sync up all processors
 		if (MPI_Barrier(MPI_COMM_WORLD) != MPI_SUCCESS) {
 			printf("MPI_Barrier error in processor %d \n", my_rank);
 			exit(1);
 		}
+		end = rdtsc();
+		barrier_time += ((double)(end-start)) / CLOCK_RATE_BGL;
 
+		start = rdtsc();
 		perform_calculations();
-		
+		end = rdtsc();
+		computation_time += ((double)(end-start)) / CLOCK_RATE_BGL;
 		count++;
 
 		// print out state if needed
@@ -89,6 +101,10 @@ int main(int argc, char* argv[])
 		// print out step to screen
 		if ((my_rank == 0) && (count % PRINTOUT_INTERVAL == 0))
 		        printf("%d: Finished step %d.\n", my_rank, count);
+
+		// print out timing results
+		if ((count % TIMING_INTERVAL) == 0)
+		    printTimingResults();
 	}
 	
 	MPI_Finalize();
@@ -114,6 +130,10 @@ void initialize(char* fileName)
 	
 }
 
+/**
+ * Applies gravitation to stars found in the "stars" array.  We sent the index of the 
+ * star to the apply_gravitation function.
+ */
 void do_gravitation()
 {
 	int i;
@@ -122,12 +142,17 @@ void do_gravitation()
 	        apply_gravitation(i);
 }
 
+/**
+ * Performs all the calculations needed in each timestep.  This includes all
+ * message passing (which passes around the galaxy arrays).
+ */
 void perform_calculations()
 {
 	int i;
 	int round = 0, r_flag, s_flag, dest;
 	MPI_Request recv_req, send_req;
 	MPI_Status recv_status, send_status;
+	unsigned long long r_start, r_end, s_start, s_end;
 
 	// initialize acceleration
 	for (i=0;i<num_stars;i++)
@@ -139,9 +164,12 @@ void perform_calculations()
 	
 	while (round < my_size) {
 	  if (round != 0) { // if not the first round, wait for previous recieve to be done
+	    r_start = rdtsc();
 	    do {
 	      MPI_Test(&recv_req, &r_flag, &recv_status);
 	    } while (r_flag == 0);
+	    r_end = rdtsc();
+	    message_time += ((double)(r_end-r_start)) / CLOCK_RATE_BGL;
 
 	    galaxy = recv_array;
 	  }
@@ -157,9 +185,12 @@ void perform_calculations()
 	   
 	  if (round > 0) {
 	    // need to make sure last send finished before sending again
+	    s_start = rdtsc();
 	    do {
 	      MPI_Test(&send_req, &s_flag, &send_status);
 	    } while (s_flag == 0);    
+	    s_end = rdtsc();
+	    message_time += ((double)(s_end-s_start)) / CLOCK_RATE_BGL;
 	  }
 	  
 	  if (round != my_size - 1) { // if not the last loop	    
@@ -168,13 +199,6 @@ void perform_calculations()
 	    MPI_Isend(galaxy, num_stars, MPI_STAR, dest, 0, MPI_COMM_WORLD, &send_req);
 	  }
 	  round++;
-	}
-
-	for (i=0;i<num_stars;i++)
-	{
-		galaxy[i].x_acc = stars[i].x_acc;
-		galaxy[i].y_acc = stars[i].y_acc;
-		galaxy[i].z_acc = stars[i].z_acc;
 	}
 }
 
