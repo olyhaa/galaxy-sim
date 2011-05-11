@@ -39,8 +39,6 @@ typedef struct
 	double x_acc;
 	double y_acc;
 	double z_acc;
-        // Dark matter flag
-        int isDark;
 } star;
 
 /********** Variable Definitions **********/
