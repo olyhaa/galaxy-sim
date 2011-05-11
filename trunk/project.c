@@ -28,10 +28,11 @@
 
 /********** Variable Definitions **********/
 
-#define OUTPUT_INTERVAL 1000	// Number of timesteps between each output to file
-#define MAX_COUNT 5000	        // Maximum number of iterations
-#define PRINTOUT_INTERVAL 100   // Number of timesteps between each output to screen
-#define TIMING_INTERVAL 500     // Number of timesteps between each timing dump
+#define OUTPUT_INTERVAL 500	// Number of timesteps between each output to filex
+#define MAX_COUNT 500	        // Maximum number of iterations
+#define TIMING_INTERVAL 500     // Number of timesteps between timing stats
+#define DISPLAY_INTERVAL 10     // Number of timesteps between each output to screen 
+#define ANIMATION_INTERVAL 50   // Number of timesteps between each output for animation
 
 /********** Variable Declarations **********/
 MPI_Datatype MPI_STAR;
@@ -66,11 +67,11 @@ int main(int argc, char* argv[])
 	MPI_Comm_size(MPI_COMM_WORLD, &my_size);
 	
 	// get filename from command line args
-	if (argc < 2) {
-		printf("USAGE: mpirun -np n [filename]\n");
+	if (argc < 3) {
+		printf("USAGE: mpirun -np n [inputStarsFile] [darkMatterFile]\n");
 		exit(1);
 	} else { // get stars from file
-		initialize(argv[1]);
+	  initialize(argv[1], argv[2]);
 	}
  
 	while (count < MAX_COUNT) {
@@ -92,19 +93,28 @@ int main(int argc, char* argv[])
 		// print out state if needed
 		if (count % OUTPUT_INTERVAL == 0) {
 			strcpy(str, "./states/outFile");
-			sprintf(cstr, "%d", count);
+			sprintf(cstr, "%03d", count);
 			strcat(str, cstr);
 			strcat(str, ".txt");
-			printStarInfo(str);
+			printStarInfo(str, 1);
+		}
+
+		// print out positions for animations
+		if (count % ANIMATION_INTERVAL == 0) {
+			strcpy(str, "./animations/outFile");
+			sprintf(cstr, "%03d", count);
+			strcat(str, cstr);
+			strcat(str, ".txt");
+			printStarInfo(str, 0);
 		}
 
 		// print out step to screen
-		if ((my_rank == 0) && (count % PRINTOUT_INTERVAL == 0))
+		if (my_rank == 0 && count % DISPLAY_INTERVAL == 0) 
 		        printf("%d: Finished step %d.\n", my_rank, count);
-
-		// print out timing results
-		if ((count % TIMING_INTERVAL) == 0)
-		    printTimingResults();
+		
+		if (count % TIMING_INTERVAL == 0) 
+			printTimingResults();
+		
 	}
 	
 	MPI_Finalize();
@@ -116,18 +126,18 @@ int main(int argc, char* argv[])
  * Call helper functions to load the data, create the array,
  * and otherwise set up the program's initial conditions.
  */
-void initialize(char* fileName) 
+void initialize(char* fileName, char* darkMatter) 
 {
-  	int lengths[3] = {1, 10, 1};
-	MPI_Aint disp[3] = {0, 0, 40};
-	MPI_Datatype types[3] = {MPI_LB, MPI_DOUBLE, MPI_UB};
+  int lengths[4] = {1, 10, 1, 1};
+  MPI_Aint disp[4] = {0, 0, 40, 44};
+  MPI_Datatype types[4] = {MPI_LB, MPI_DOUBLE, MPI_INT, MPI_UB};
 	
-	MPI_Type_create_struct(3, lengths, disp, types, &MPI_STAR);
-	MPI_Type_commit(&MPI_STAR);
-	
-	// populate galaxy
-	getStarInfo(fileName);
-	
+  MPI_Type_create_struct(4, lengths, disp, types, &MPI_STAR);
+  MPI_Type_commit(&MPI_STAR);
+  
+  // populate galaxy
+  getStarInfo(fileName, darkMatter);	
+
 }
 
 /**
@@ -138,6 +148,7 @@ void do_gravitation()
 {
 	int i;
 
+	// apply gravitation due to stars and dark matter
 	for (i=0;i<num_stars;i++)
 	        apply_gravitation(i);
 }
@@ -177,7 +188,7 @@ void perform_calculations()
 	  // recieve array from the previous processor
 	  if (round != my_size - 1) {
 	    dest = (my_rank - 1 + my_size) % my_size;
-	    MPI_Irecv(recv_array, num_stars, MPI_STAR, dest, MPI_ANY_TAG, MPI_COMM_WORLD, &recv_req);
+	    MPI_Irecv(recv_array, num_stars + num_dark, MPI_STAR, dest, MPI_ANY_TAG, MPI_COMM_WORLD, &recv_req);
 	    
 	    // apply gravitation to the portion of current galaxy
 	    do_gravitation();
@@ -196,10 +207,26 @@ void perform_calculations()
 	  if (round != my_size - 1) { // if not the last loop	    
 	    // send block to next processor
 	    dest = (my_rank + 1) % my_size;
-	    MPI_Isend(galaxy, num_stars, MPI_STAR, dest, 0, MPI_COMM_WORLD, &send_req);
+	    MPI_Isend(galaxy, num_stars + num_dark, MPI_STAR, dest, 0, MPI_COMM_WORLD, &send_req);
 	  }
 	  round++;
 	}
+
+	// update velocities and accelerations
+	for (i=0;i<num_stars;i++)
+	  {
+		stars[i].x_pos = stars[i].x_pos + stars[i].x_v + 0.5 * stars[i].x_acc;
+		stars[i].y_pos = stars[i].y_pos + stars[i].y_v + 0.5 * stars[i].y_acc;
+		stars[i].z_pos = stars[i].z_pos + stars[i].z_v + 0.5 * stars[i].z_acc;
+
+		stars[i].x_v = stars[i].x_v + stars[i].x_acc;
+		stars[i].y_v = stars[i].y_v + stars[i].y_acc;
+		stars[i].z_v = stars[i].z_v + stars[i].z_acc;		
+	  }
+
+	// copy stars back into galaxy
+	memcpy(galaxy, stars, num_stars);
+
 }
 
 #endif
