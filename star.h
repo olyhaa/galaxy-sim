@@ -39,6 +39,8 @@ typedef struct
 	double x_acc;
 	double y_acc;
 	double z_acc;
+        // Dark matter flag
+        int isDark;
 } star;
 
 /********** Variable Definitions **********/
@@ -56,6 +58,7 @@ star* stars;
 int my_rank;
 int my_size;
 int num_stars;                          // The number of stars assigned to this processor
+int num_dark;
 
 /********** Function Headers **********/
 
@@ -155,7 +158,7 @@ int* get_closest_stars(int origin)
 void apply_gravitation(int i) 
 {
         int x;
-	for(x = 0; x < num_stars; x++)
+	for(x = 0; x < num_stars + num_dark; x++)
 	{
 	  if(equal(stars[i], galaxy[x]) == 0)
 	    {
