@@ -92,8 +92,11 @@ int main(int argc, char* argv[])
 
 		// print out state if needed
 		if (count % OUTPUT_INTERVAL == 0) {
-			strcpy(str, "./states/outFile");
-			sprintf(cstr, "%03d", count);
+		  strcpy(str, "./states");
+		  sprintf(cstr, "%02d", my_size);
+		  strcat(str, cstr);
+		  strcat(str, "/outFile");
+			sprintf(cstr, "%04d", count);
 			strcat(str, cstr);
 			strcat(str, ".txt");
 			printStarInfo(str, 1);
@@ -101,8 +104,11 @@ int main(int argc, char* argv[])
 
 		// print out positions for animations
 		if (count % ANIMATION_INTERVAL == 0) {
-			strcpy(str, "./animations/outFile");
-			sprintf(cstr, "%03d", count);
+		  strcpy(str, "./animations");
+		  sprintf(cstr, "%02d", my_size);
+		  strcat(str, cstr);
+		  strcat(str, "/outFile");
+			sprintf(cstr, "%04d", count);
 			strcat(str, cstr);
 			strcat(str, ".txt");
 			printStarInfo(str, 0);
@@ -128,11 +134,11 @@ int main(int argc, char* argv[])
  */
 void initialize(char* fileName, char* darkMatter) 
 {
-  int lengths[4] = {1, 10, 1, 1};
-  MPI_Aint disp[4] = {0, 0, 40, 44};
-  MPI_Datatype types[4] = {MPI_LB, MPI_DOUBLE, MPI_INT, MPI_UB};
+  int lengths[3] = {1, 10, 1};
+  MPI_Aint disp[3] = {0, 0, 40};
+  MPI_Datatype types[3] = {MPI_LB, MPI_DOUBLE, MPI_UB};
 	
-  MPI_Type_create_struct(4, lengths, disp, types, &MPI_STAR);
+  MPI_Type_create_struct(3, lengths, disp, types, &MPI_STAR);
   MPI_Type_commit(&MPI_STAR);
   
   // populate galaxy
@@ -149,7 +155,7 @@ void do_gravitation()
 	int i;
 
 	// apply gravitation due to stars and dark matter
-	for (i=0;i<num_stars;i++)
+	for (i=0;i<num_stars+num_dark;i++)
 	        apply_gravitation(i);
 }
 
@@ -189,10 +195,10 @@ void perform_calculations()
 	  if (round != my_size - 1) {
 	    dest = (my_rank - 1 + my_size) % my_size;
 	    MPI_Irecv(recv_array, num_stars + num_dark, MPI_STAR, dest, MPI_ANY_TAG, MPI_COMM_WORLD, &recv_req);
-	    
-	    // apply gravitation to the portion of current galaxy
-	    do_gravitation();
 	  }
+	  // apply gravitation to the portion of current galaxy
+	  do_gravitation();
+	  
 	   
 	  if (round > 0) {
 	    // need to make sure last send finished before sending again
@@ -225,7 +231,7 @@ void perform_calculations()
 	  }
 
 	// copy stars back into galaxy
-	memcpy(galaxy, stars, num_stars);
+	memcpy(galaxy, stars, num_stars+num_dark);
 
 }
 

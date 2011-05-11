@@ -62,7 +62,7 @@ void getStarInfo(char* fileName, char* darkMatter) {
   int i, offset;
   int line_length = 133; // 18 chars per field, 7 fields, 6 separating commas, 1 newline
   double x_p, y_p, z_p, x_vl, y_vl, z_vl, m;
-  char buf[1024];
+  char buf[1024], str[100], cstr[100];
   MPI_Status status;
   unsigned long long start, end;
 
@@ -158,8 +158,13 @@ void getStarInfo(char* fileName, char* darkMatter) {
   // close file
   MPI_File_close(&darkfile);
 
+  strcpy("./timing");
+  sprintf(cstr, "%02d", my_size);
+  strcat(str, cstr);
+  strcat(str, "/timing_io_results.txt");
+
   // write out timing results
-  if (MPI_File_open(MPI_COMM_WORLD, "timing_io_results.txt", MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, &file) != MPI_SUCCESS) {
+  if (MPI_File_open(MPI_COMM_WORLD, str, MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, &file) != MPI_SUCCESS) {
     printf("%d: Error in opening file.\n", my_rank);
     exit(1);
   }
@@ -188,7 +193,7 @@ int printStarInfo(char* fileName, int print_velocity) {
 
   // get file, open it
   MPI_File file;
-  char buf[1024]; 
+  char buf[1024], str[100], cstr[100]; 
   int i, offset, line_length;
   MPI_Status status;
   unsigned long long start, end;
@@ -229,9 +234,13 @@ int printStarInfo(char* fileName, int print_velocity) {
   // close file 
   MPI_File_close(&file);
 
+  strcpy("./timing");
+  sprintf(cstr, "%02d", my_size);
+  strcat(str, cstr);
+  strcat(str, "/timing_io_results.txt");
   
   // write out timing results
-  if (MPI_File_open(MPI_COMM_WORLD, "./timing/timing_io_results.txt", MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, &file) != MPI_SUCCESS) {
+  if (MPI_File_open(MPI_COMM_WORLD, str, MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, &file) != MPI_SUCCESS) {
     printf("%d: Error in opening file.\n", my_rank);
     exit(1);
   }
@@ -259,8 +268,13 @@ void printTimingResults()
   MPI_File file;
   MPI_Status status;
 
+  strcpy("./timing");
+  sprintf(cstr, "%02d", my_size);
+  strcat(str, cstr);
+  strcat(str, "/barrier_results.txt");
+
   // BARRIER
-  if (MPI_File_open(MPI_COMM_WORLD, "./timing/barrier_results.txt", MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, &file) != MPI_SUCCESS) {
+  if (MPI_File_open(MPI_COMM_WORLD, str, MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, &file) != MPI_SUCCESS) {
     printf("%d: Error in opening barrier file.\n", my_rank);
     exit(1);
   }
@@ -293,9 +307,13 @@ void printTimingResults()
 
   comp_count++;
 
+  strcpy("./timing");
+  sprintf(cstr, "%02d", my_size);
+  strcat(str, cstr);
+  strcat(str, "/message_results.txt");
 
   // MESSAGE
-  if (MPI_File_open(MPI_COMM_WORLD, "./timing/message_results.txt", MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, &file) != MPI_SUCCESS) {
+  if (MPI_File_open(MPI_COMM_WORLD, str, MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, &file) != MPI_SUCCESS) {
     printf("%d: Error in opening file.\n", my_rank);
     exit(1);
   }
