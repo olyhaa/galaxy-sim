@@ -28,13 +28,14 @@
 
 /********** Variable Definitions **********/
 
-#define OUTPUT_INTERVAL 500	// Number of timesteps between each output to filex
-#define MAX_COUNT 500	        // Maximum number of iterations
-#define TIMING_INTERVAL 500     // Number of timesteps between timing stats
-#define DISPLAY_INTERVAL 10     // Number of timesteps between each output to screen 
-#define ANIMATION_INTERVAL 50   // Number of timesteps between each output for animation
+#define OUTPUT_INTERVAL 100	// Number of timesteps between each output to filex
+#define MAX_COUNT 100	        // Maximum number of iterations
+#define TIMING_INTERVAL 100     // Number of timesteps between timing stats
+#define DISPLAY_INTERVAL 5     // Number of timesteps between each output to screen 
+#define ANIMATION_INTERVAL 200   // Number of timesteps between each output for animation
 
 /********** Variable Declarations **********/
+
 MPI_Datatype MPI_STAR;
 
 /********** Function Headers **********/
@@ -54,13 +55,15 @@ int main(int argc, char* argv[])
 {
 	int count = 0;
 	char str[100], cstr[100];
-	unsigned long long start, end;
+	unsigned long long start, end, s, e;
 
 	// initialize MPI environment
 	if (MPI_Init(&argc, &argv) != MPI_SUCCESS) {
 		printf("MPI intialization failed.\n");
 		exit(1);
 	}
+
+	start = rdtsc();
 	
 	// get number of processors, current rank
 	MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
@@ -75,19 +78,16 @@ int main(int argc, char* argv[])
 	}
  
 	while (count < MAX_COUNT) {
-	        start = rdtsc();
+	        s = rdtsc();
 		// sync up all processors
 		if (MPI_Barrier(MPI_COMM_WORLD) != MPI_SUCCESS) {
 			printf("MPI_Barrier error in processor %d \n", my_rank);
 			exit(1);
 		}
-		end = rdtsc();
-		barrier_time += ((double)(end-start)) / CLOCK_RATE_BGL;
+		e = rdtsc();
+		barrier_time += ((double)(e-s)) / CLOCK_RATE_KRATOS;
 
-		start = rdtsc();
 		perform_calculations();
-		end = rdtsc();
-		computation_time += ((double)(end-start)) / CLOCK_RATE_BGL;
 		count++;
 
 		// print out state if needed
@@ -96,10 +96,10 @@ int main(int argc, char* argv[])
 		  sprintf(cstr, "%02d", my_size);
 		  strcat(str, cstr);
 		  strcat(str, "/outFile");
-			sprintf(cstr, "%04d", count);
-			strcat(str, cstr);
-			strcat(str, ".txt");
-			printStarInfo(str, 1);
+		  sprintf(cstr, "%04d", count);
+		  strcat(str, cstr);
+		  strcat(str, ".txt");
+		  printStarInfo(str, 1);
 		}
 
 		// print out positions for animations
@@ -108,10 +108,10 @@ int main(int argc, char* argv[])
 		  sprintf(cstr, "%02d", my_size);
 		  strcat(str, cstr);
 		  strcat(str, "/outFile");
-			sprintf(cstr, "%04d", count);
-			strcat(str, cstr);
-			strcat(str, ".txt");
-			printStarInfo(str, 0);
+		  sprintf(cstr, "%04d", count);
+		  strcat(str, cstr);
+		  strcat(str, ".txt");
+		  printStarInfo(str, 0);
 		}
 
 		// print out step to screen
@@ -120,11 +120,14 @@ int main(int argc, char* argv[])
 		
 		if (count % TIMING_INTERVAL == 0) 
 			printTimingResults();
-		
 	}
-	
-	MPI_Finalize();
-	
+
+	end = rdtsc();
+
+	printf("%d: Total Time = %lf\n", my_rank, ((double)(end-start))/CLOCK_RATE_KRATOS);
+
+	MPI_Finalize();	
+
 	return 0;
 }
 
@@ -134,8 +137,8 @@ int main(int argc, char* argv[])
  */
 void initialize(char* fileName, char* darkMatter) 
 {
-  int lengths[3] = {1, 10, 1};
-  MPI_Aint disp[3] = {0, 0, 40};
+  int lengths[3] = {1, 4, 1};
+  MPI_Aint disp[3] = {0, 0, 16};
   MPI_Datatype types[3] = {MPI_LB, MPI_DOUBLE, MPI_UB};
 	
   MPI_Type_create_struct(3, lengths, disp, types, &MPI_STAR);
@@ -169,7 +172,7 @@ void perform_calculations()
 	int round = 0, r_flag, s_flag, dest;
 	MPI_Request recv_req, send_req;
 	MPI_Status recv_status, send_status;
-	unsigned long long r_start, r_end, s_start, s_end;
+	unsigned long long r_start, r_end, s_start, s_end, start, end;
 
 	// initialize acceleration
 	for (i=0;i<num_stars;i++)
@@ -181,12 +184,11 @@ void perform_calculations()
 	
 	while (round < my_size) {
 	  if (round != 0) { // if not the first round, wait for previous recieve to be done
-	    r_start = rdtsc();
 	    do {
 	      MPI_Test(&recv_req, &r_flag, &recv_status);
 	    } while (r_flag == 0);
 	    r_end = rdtsc();
-	    message_time += ((double)(r_end-r_start)) / CLOCK_RATE_BGL;
+	    message_time += ((double)(r_end-r_start)) / CLOCK_RATE_KRATOS;
 
 	    galaxy = recv_array;
 	  }
@@ -195,25 +197,30 @@ void perform_calculations()
 	  if (round != my_size - 1) {
 	    dest = (my_rank - 1 + my_size) % my_size;
 	    MPI_Irecv(recv_array, num_stars + num_dark, MPI_STAR, dest, MPI_ANY_TAG, MPI_COMM_WORLD, &recv_req);
+	    r_start = rdtsc();
 	  }
 	  // apply gravitation to the portion of current galaxy
+	  start = rdtsc();
 	  do_gravitation();
-	  
+	  end = rdtsc();
+	  computation_time += ((double)(end-start)) / CLOCK_RATE_KRATOS;
+		
 	   
 	  if (round > 0) {
 	    // need to make sure last send finished before sending again
-	    s_start = rdtsc();
 	    do {
 	      MPI_Test(&send_req, &s_flag, &send_status);
 	    } while (s_flag == 0);    
 	    s_end = rdtsc();
-	    message_time += ((double)(s_end-s_start)) / CLOCK_RATE_BGL;
+	    message_time += ((double)(s_end-s_start)) / CLOCK_RATE_KRATOS;
 	  }
 	  
 	  if (round != my_size - 1) { // if not the last loop	    
 	    // send block to next processor
 	    dest = (my_rank + 1) % my_size;
 	    MPI_Isend(galaxy, num_stars + num_dark, MPI_STAR, dest, 0, MPI_COMM_WORLD, &send_req);
+	    s_start = rdtsc();
+	    
 	  }
 	  round++;
 	}
@@ -231,7 +238,12 @@ void perform_calculations()
 	  }
 
 	// copy stars back into galaxy
-	memcpy(galaxy, stars, num_stars+num_dark);
+	for (i=0; i < num_stars+num_dark;i++) {
+	  galaxy[i].x_pos = stars[i].x_pos;
+	  galaxy[i].y_pos = stars[i].y_pos;
+	  galaxy[i].z_pos = stars[i].z_pos;
+	  galaxy[i].mass = stars[i].mass;
+	}
 
 }
 

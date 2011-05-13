@@ -14,6 +14,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+
 #ifndef GALAXY_SIM_STAR_H
 #define GALAXY_SIM_STAR_H
 
@@ -41,6 +42,16 @@ typedef struct
 	double z_acc;
 } star;
 
+typedef struct
+{
+	// Components of star position
+	double x_pos;
+	double y_pos;
+	double z_pos;
+	// Mass of star -- currently all stars are assumed to have the same mass
+	double mass;
+} mpi_star;
+
 /********** Variable Definitions **********/
 
 #define STARS_IN_CLUSTER 1		// See description of cluster() function
@@ -50,8 +61,8 @@ typedef struct
 
 //double** closest_cluster_stars[NUMBER_OF_STARS/STARS_IN_CLUSTER][STARS_IN_CLUSTER];	//Keeps track of star indices for faster cluster computation
 long NUMBER_OF_STARS;			// The number of stars in the galaxy
-star* galaxy;
-star* recv_array;
+mpi_star* galaxy;
+mpi_star* recv_array;
 star* stars;
 int my_rank;
 int my_size;
@@ -61,12 +72,12 @@ int num_dark;
 /********** Function Headers **********/
 
 star cluster(star* cluster_stars);
-double distance(star self, star other);
+double distance(star self, mpi_star other);
 //int* get_closest_stars(int origin);
 //star* apply_gravitation(star* self, star** galaxy);
 void apply_gravitation(int i);
-void force_of_gravity(int self, star other);
-int equal(star first, star second);
+void force_of_gravity(int self, mpi_star other);
+int equal(star first, mpi_star second);
 
 /********** Function Declarations **********/
 
@@ -110,7 +121,7 @@ star cluster(star* cluster_stars)
  * INPUT: the two stars under consideration
  * OUTPUT: 3-dimensional distance between the input stars as a double
  */
-double distance(star self, star other)
+double distance(star self, mpi_star other)
 {
 	double dist = pow(other.x_pos - self.x_pos,2) + pow(other.y_pos - self.y_pos,2) + pow(other.z_pos - self.z_pos,2);
 	return sqrt(dist);
@@ -170,7 +181,7 @@ void apply_gravitation(int i)
  * 
  * INPUT: the index of the star under consideration, the star of the oustide force
  */
-void force_of_gravity(int self, star other)
+void force_of_gravity(int self, mpi_star other)
 {
         double G = 4.49734287 * pow(10.0,-9);	// Gravitational constant, using units of parsecs * (solar mass units)^-1 * (parsecs/millennium)^2
 	double r = distance(stars[self], other);
@@ -186,10 +197,10 @@ void force_of_gravity(int self, star other)
 /**
  * An equals function used in apply_gravitation to reduce computation
  */
-int equal(star first, star second) 
+int equal(star first, mpi_star second) 
 {
   if (first.x_pos == second.x_pos && first.y_pos == second.y_pos && first.z_pos == second.z_pos 
-      && first.x_v == second.x_v && first.y_v == second.y_v && first.z_v == second.z_v && first.mass == second.mass) 
+     && first.mass == second.mass) 
     return 1;
   return 0;
 }
