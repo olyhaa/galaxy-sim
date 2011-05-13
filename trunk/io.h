@@ -18,6 +18,7 @@
 #define GALAXY_SIM_IO_H
 
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include "star.h"
 #include "mpi.h"
@@ -105,8 +106,8 @@ void getStarInfo(char* fileName, char* darkMatter) {
   if (my_rank == 0)
     printf("%d: We have %ld stars, each processor has %d stars and %d dark matter 'stars'.\n",  my_rank, NUMBER_OF_STARS, num_stars, num_dark);
  
-  galaxy = (star*) malloc((num_stars + num_dark) * sizeof(star));
-  recv_array = (star*) malloc((num_stars + num_dark) * sizeof(star));
+  galaxy = (mpi_star*) malloc((num_stars + num_dark) * sizeof(mpi_star));
+  recv_array = (mpi_star*) malloc((num_stars + num_dark) * sizeof(mpi_star));
   stars = (star*) malloc((num_stars + num_dark) * sizeof(star));
 
   for (i = 0; i < num_stars; i++) {
@@ -120,9 +121,9 @@ void getStarInfo(char* fileName, char* darkMatter) {
     (stars[i]).x_pos = (galaxy[i]).x_pos = x_p;
     (stars[i]).y_pos = (galaxy[i]).y_pos = y_p;
     (stars[i]).z_pos = (galaxy[i]).z_pos = z_p;
-    (stars[i]).x_v   = (galaxy[i]).x_v   = x_vl;
-    (stars[i]).y_v   = (galaxy[i]).y_v   = y_vl;
-    (stars[i]).z_v   = (galaxy[i]).z_v   = z_vl;
+    (stars[i]).x_v   = x_vl;
+    (stars[i]).y_v   = y_vl;
+    (stars[i]).z_v   = z_vl;
     (stars[i]).mass  = (galaxy[i]).mass  = m; 
   }
   
@@ -149,16 +150,16 @@ void getStarInfo(char* fileName, char* darkMatter) {
     (stars[i + num_stars]).x_pos = (galaxy[i + num_stars]).x_pos = x_p;
     (stars[i + num_stars]).y_pos = (galaxy[i + num_stars]).y_pos = y_p;
     (stars[i + num_stars]).z_pos = (galaxy[i + num_stars]).z_pos = z_p;
-    (stars[i + num_stars]).x_v   = (galaxy[i + num_stars]).x_v   = 0;
-    (stars[i + num_stars]).y_v   = (galaxy[i + num_stars]).y_v   = 0;
-    (stars[i + num_stars]).z_v   = (galaxy[i + num_stars]).z_v   = 0;
+    (stars[i + num_stars]).x_v   = 0;
+    (stars[i + num_stars]).y_v   = 0;
+    (stars[i + num_stars]).z_v   = 0;
     (stars[i + num_stars]).mass  = (galaxy[i + num_stars]).mass  = 4; 
   }
   
   // close file
   MPI_File_close(&darkfile);
 
-  strcpy("./timing");
+  strcpy(str, "./timing");
   sprintf(cstr, "%02d", my_size);
   strcat(str, cstr);
   strcat(str, "/timing_io_results.txt");
@@ -171,7 +172,7 @@ void getStarInfo(char* fileName, char* darkMatter) {
 
   offset = io_count * my_size * 20 + my_rank * 20;
   
-  sprintf(buf, "%04d,%014.9lf\n", my_rank, ((double)(end-start))/CLOCK_RATE_BGL);
+  sprintf(buf, "%04d,%014.9lf\n", my_rank, ((double)(end-start))/CLOCK_RATE_KRATOS);
  
   MPI_File_write_at(file, offset, buf, 20, MPI_CHAR, &status);
   
@@ -234,7 +235,8 @@ int printStarInfo(char* fileName, int print_velocity) {
   // close file 
   MPI_File_close(&file);
 
-  strcpy("./timing");
+
+  strcpy(str, "./timing");
   sprintf(cstr, "%02d", my_size);
   strcat(str, cstr);
   strcat(str, "/timing_io_results.txt");
@@ -247,7 +249,7 @@ int printStarInfo(char* fileName, int print_velocity) {
 
   offset = io_count * my_size * 20 + my_rank * 20;
   
-  sprintf(buf, "%04d,%014.9lf\n", my_rank, ((double)(end-start))/CLOCK_RATE_BGL);
+  sprintf(buf, "%04d,%014.9lf\n", my_rank, ((double)(end-start))/CLOCK_RATE_KRATOS);
 
   MPI_File_write_at(file, offset, buf, 20, MPI_CHAR, &status);
   
@@ -264,11 +266,11 @@ int printStarInfo(char* fileName, int print_velocity) {
 void printTimingResults() 
 {
   int offset;
-  char buf[100];
+  char buf[100], str[100], cstr[100];
   MPI_File file;
   MPI_Status status;
 
-  strcpy("./timing");
+  strcpy(str, "./timing");
   sprintf(cstr, "%02d", my_size);
   strcat(str, cstr);
   strcat(str, "/barrier_results.txt");
@@ -290,8 +292,13 @@ void printTimingResults()
 
   b_count++;
 
+  strcpy(str, "./timing");
+  sprintf(cstr, "%02d", my_size);
+  strcat(str, cstr);
+  strcat(str, "/computational_results.txt");
+
   // COMPUTATION
-  if (MPI_File_open(MPI_COMM_WORLD, "./timing/computation_results.txt", MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, &file) != MPI_SUCCESS) {
+  if (MPI_File_open(MPI_COMM_WORLD, str, MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, &file) != MPI_SUCCESS) {
     printf("%d: Error in opening computation file.\n", my_rank);
     exit(1);
   }
@@ -307,7 +314,8 @@ void printTimingResults()
 
   comp_count++;
 
-  strcpy("./timing");
+
+  strcpy(str, "./timing");
   sprintf(cstr, "%02d", my_size);
   strcat(str, cstr);
   strcat(str, "/message_results.txt");
