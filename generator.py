@@ -60,7 +60,7 @@ text_file.close()
 #Warning: If n gets to large the galaxy will become to large, you must adjust scalling factor bellow
 #for about 12,000 stars use n=75 m=250                                                                                                              
 n=75.0
-m=250.0
+m=50.0
 ##Create Arms
 
 
@@ -151,10 +151,18 @@ for i in range(int(n_c)):
   #xv.pop()
   #yv.pop()
   #zv.pop()
+  
+  
+#Find mass of stars approx
+
+totalmass=6*10**11
+MassPerStar=totalmass/len(x)
+#print MassPerStar
+
 out=open('out.txt','w')
 out.write('%012d'%len(x)+'\n')
 for i in range(len(x)):
-  out.write('% 018.9f'%x[i]+',''% 018.9f'%y[i]+','+'% 018.9f'%z[i]+','+'% 018.9f'%xv[i]+','+'% 018.9f'%yv[i]+','+'% 018.9f'%zv[i]+',''% 018.9f'%1+'\n')
+  out.write('% 018.9f'%x[i]+',''% 018.9f'%y[i]+','+'% 018.9f'%z[i]+','+'% 018.9f'%xv[i]+','+'% 018.9f'%yv[i]+','+'% 018.9f'%zv[i]+',''% 020.7f'%MassPerStar+'\n')
 
 out.close()
 #plt.figure()
@@ -169,25 +177,26 @@ xdark=[]
 ydark=[]
 zdark=[]
 #Create Dark Matter Halo
-for i in arange(-maxval_r,maxval_r,maxval_r/(2**4)):
-  for j in arange(-maxval_r,maxval_r,maxval_r/(2**4)):
-    for k in arange(-maxval_r,maxval_r,maxval_r/(2**4)):
+for i in arange(-maxval_r,maxval_r,maxval_r/(2**3.5)):
+  for j in arange(-maxval_r,maxval_r,maxval_r/(2**3.5)):
+    for k in arange(-maxval_r,maxval_r,maxval_r/(2**3.5)):
       if (i**2+j**2+k**2)<maxval2:
         xdark.append(i)
         ydark.append(j)
         zdark.append(k)
 
 out=open('out_dark.txt','w')
-
+DarkMassPer=(totalmass*5)/len(xdark)
+#print DarkMassPer
 for i in range(len(xdark)):
-  out.write('% 018.9f'%xdark[i]+',''% 018.9f'%ydark[i]+','+'% 018.9f'%zdark[i]+'\n')
+  out.write('% 018.9f'%xdark[i]+',''% 018.9f'%ydark[i]+','+'% 018.9f'%zdark[i]+','+'% 020.7f'%DarkMassPer+'\n')
 
 out.close()
 
 #print max(rt)
 #maxval_r=maxval
 
-
+#print "number of dark matter pieces:"+str(len(xdark))
 
 fig=plt.figure() 
 ax = p3.Axes3D(fig)  
