@@ -188,6 +188,7 @@ for i in arange(-maxval_r,maxval_r,maxval_r/(2**3.5)):
 out=open('out_dark.txt','w')
 DarkMassPer=(totalmass*5)/len(xdark)
 #print DarkMassPer
+out.write('%012d'%len(xdark)+'\n')
 for i in range(len(xdark)):
   out.write('% 018.9f'%xdark[i]+',''% 018.9f'%ydark[i]+','+'% 018.9f'%zdark[i]+','+'% 020.7f'%DarkMassPer+'\n')
 
