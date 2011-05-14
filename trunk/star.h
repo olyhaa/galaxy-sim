@@ -185,16 +185,14 @@ void force_of_gravity(int self, mpi_star other)
 {
         double G = 4.49734287 * pow(10.0,-9);	// Gravitational constant, using units of parsecs * (solar mass units)^-1 * (parsecs/millennium)^2
 	double r = distance(stars[self], other);
+	double force = G * stars[self].mass * other.mass;
 	if(r < pow(10,-5))
-	{
-		double force = G * stars[self].mass * other.mass;
+		r = pow(10,-5);
+	force /= pow(r,3);
 
-		force /= pow(r,3);
-
-		stars[self].x_acc += force * (other.x_pos - stars[self].x_pos);
-		stars[self].y_acc += force * (other.y_pos - stars[self].y_pos);
-		stars[self].z_acc += force * (other.z_pos - stars[self].z_pos);
-	}
+	stars[self].x_acc += force * (other.x_pos - stars[self].x_pos);
+	stars[self].y_acc += force * (other.y_pos - stars[self].y_pos);
+	stars[self].z_acc += force * (other.z_pos - stars[self].z_pos);
 }
 
 /**
