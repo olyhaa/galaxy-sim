@@ -41,7 +41,8 @@ double max_z;
 /********** Function Headers **********/
 
 void getStarInfo(char* fileName, char* darkfile);
-int printStarInfo(char* fileName, int print_velocity);
+int printStarInfo(char* fileName);
+int printAnimations(char* fileName);
 void printTimingResults();
 
 /********** Function Declarations **********/
@@ -138,13 +139,13 @@ void getStarInfo(char* fileName, char* darkMatter) {
     exit(1);
   }
 
-  line_length = 58;
+  line_length = 58+19;
   for (i = 0; i < num_dark; i++) {
     offset = my_rank * line_length * num_dark + i * line_length;
 
     MPI_File_read_at(file, offset, buf, line_length, MPI_CHAR, &status);
 
-    sscanf(buf, "%lf,%lf,%lf\n", &x_p, &y_p, &z_p);
+    sscanf(buf, "%lf,%lf,%lf\n", &x_p, &y_p, &z_p, &m);
 
     // malloc all galaxy arrays
     (stars[i + num_stars]).x_pos = (galaxy[i + num_stars]).x_pos = x_p;
@@ -153,7 +154,7 @@ void getStarInfo(char* fileName, char* darkMatter) {
     (stars[i + num_stars]).x_v   = 0;
     (stars[i + num_stars]).y_v   = 0;
     (stars[i + num_stars]).z_v   = 0;
-    (stars[i + num_stars]).mass  = (galaxy[i + num_stars]).mass  = 4; 
+    (stars[i + num_stars]).mass  = (galaxy[i + num_stars]).mass  = m; 
   }
   
   // close file
@@ -190,7 +191,7 @@ void getStarInfo(char* fileName, char* darkMatter) {
  * OUTPUT: 1 = error in creating file
  *         0 = success
  */
-int printStarInfo(char* fileName, int print_velocity) {
+int printStarInfo(char* fileName) {
 
   // get file, open it
   MPI_File file;
@@ -207,10 +208,7 @@ int printStarInfo(char* fileName, int print_velocity) {
   if (my_rank == 0)
     printf("%d: Printing out to file: %s.\n", my_rank, fileName);
 
-  if (print_velocity == 0)
-    line_length = 57;
-  else
-    line_length = 133;
+  line_length = 133;
 
   start = rdtsc();
   // print out galaxy size
@@ -223,11 +221,8 @@ int printStarInfo(char* fileName, int print_velocity) {
   for (i = 0; i < num_stars; i++) {
     offset = my_rank * line_length * num_stars + i * line_length + 13;
     
-    if (print_velocity == 1)
     sprintf(buf, "% 018lf,% 018lf,% 018lf,% 018lf,% 018lf,% 018lf,% 018lf\n", stars[i].x_pos, stars[i].y_pos, stars[i].z_pos, stars[i].x_v, stars[i].y_v, stars[i].z_v, stars[i].mass);
-    else
-      sprintf(buf, "% 018lf,% 018lf,% 018lf\n", stars[i].x_pos, stars[i].y_pos, stars[i].z_pos);
-
+  
     MPI_File_write_at(file, offset, buf, line_length, MPI_CHAR, &status);
   }
   end = rdtsc();
@@ -260,6 +255,66 @@ int printStarInfo(char* fileName, int print_velocity) {
   
   return 0;
 }
+
+int printAnimations(char* fileName) {
+
+  // get file, open it
+  MPI_File file;
+  char buf[1024], str[100], cstr[100]; 
+  int i, offset, line_length;
+  MPI_Status status;
+  unsigned long long start, end;
+
+  if (MPI_File_open(MPI_COMM_WORLD, fileName, MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &file) != MPI_SUCCESS) {
+    fprintf(stderr, "Cannot create %s.\n", fileName);
+    exit(1);
+  }
+
+  if (my_rank == 0)
+    printf("%d: Printing out to file: %s.\n", my_rank, fileName);
+
+  line_length = 57;
+  
+  start = rdtsc();
+  
+  // loop through array and output state of each star
+  for (i = 0; i < num_stars; i++) {
+    offset = my_rank * line_length * num_stars + i * line_length;
+    
+    sprintf(buf, "% 018lf,% 018lf,% 018lf\n", stars[i].x_pos, stars[i].y_pos, stars[i].z_pos);
+
+    MPI_File_write_at(file, offset, buf, line_length, MPI_CHAR, &status);
+  }
+  end = rdtsc();
+
+  // close file 
+  MPI_File_close(&file);
+
+  strcpy(str, "./timing");
+  sprintf(cstr, "%02d", my_size);
+  strcat(str, cstr);
+  strcat(str, "/timing_io_results.txt");
+  
+  // write out timing results
+  if (MPI_File_open(MPI_COMM_WORLD, str, MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, &file) != MPI_SUCCESS) {
+    printf("%d: Error in opening file.\n", my_rank);
+    exit(1);
+  }
+
+  offset = io_count * my_size * 20 + my_rank * 20;
+  
+  sprintf(buf, "%04d,%014.9lf\n", my_rank, ((double)(end-start))/CLOCK_RATE_KRATOS);
+
+  MPI_File_write_at(file, offset, buf, 20, MPI_CHAR, &status);
+  
+  // close file
+  MPI_File_close(&file);
+
+  io_count++;
+  
+  return 0;
+}
+
 /**
  * Prints barrier, computation, and message results to file (per processor)
  */
