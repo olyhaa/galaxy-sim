@@ -48,7 +48,7 @@ for line in text_file.readlines():
     #fit.append([1000*float(s) for s in line.rstrip().split()])
     temp=[float(s) for s in line.rstrip().split()]
     temp[0]=temp[0]*1000
-    temp[1]=temp[1]*0.00102268944 
+    temp[1]=temp[1]*0.00102268944*2**-3 
     #temp[
     fit.append(temp)
     #print temp
@@ -162,7 +162,7 @@ MassPerStar=totalmass/len(x)
 out=open('out.txt','w')
 out.write('%012d'%len(x)+'\n')
 for i in range(len(x)):
-  out.write('% 018.9f'%x[i]+',''% 018.9f'%y[i]+','+'% 018.9f'%z[i]+','+'% 018.9f'%xv[i]+','+'% 018.9f'%yv[i]+','+'% 018.9f'%zv[i]+',''% 020.7f'%MassPerStar+'\n')
+  out.write('% 018.12f'%(x[i]/1000.0)+',''% 018.12f'%(y[i]/1000.0)+','+'% 018.12f'%(z[i]/1000.0)+','+'% 018.12f'%(xv[i]/1000.0)+','+'% 018.12f'%(yv[i]/1000.0)+','+'% 018.12f'%(zv[i]/1000.0)+',''% 018.7f'%MassPerStar+'\n')
 
 out.close()
 #plt.figure()
@@ -190,7 +190,7 @@ DarkMassPer=(totalmass*5)/len(xdark)
 #print DarkMassPer
 out.write('%012d'%len(xdark)+'\n')
 for i in range(len(xdark)):
-  out.write('% 018.9f'%xdark[i]+',''% 018.9f'%ydark[i]+','+'% 018.9f'%zdark[i]+','+'% 020.7f'%DarkMassPer+'\n')
+  out.write('% 018.12f'%(xdark[i]/1000.0)+',''% 018.12f'%(ydark[i]/1000.0)+','+'% 018.12f'%(zdark[i]/1000.0)+','+'% 018.7f'%DarkMassPer+'\n')
 
 out.close()
 
