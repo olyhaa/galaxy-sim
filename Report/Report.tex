@@ -1,14 +1,14 @@
-\documentclass{article}   
-\usepackage{fullpage} 
+\documentclass{article}
 \usepackage{amsmath}
 \usepackage{amsfonts}
 \usepackage{amssymb}
 \usepackage{graphicx}
 \usepackage{chngpage}
 \usepackage{multicol}
+\usepackage{hyperref}
 
 \begin{document}
-\twocolumn
+
 
 \title{Parallel Galaxy Simulations}
 
@@ -34,17 +34,7 @@ Galaxies come in all shapes and sizes, each with their own characteristics.  Som
 
 We have used a simplified model of a galaxy due to the time and computational restrictions for the scope of this project.  We ignored the effects of small bodies such as planets since they do not have a significant contribution to the galactic forces.  We also did not include the effects of stellar gas or plasma in our preliminary models.
 
-We found that there have been many attempts to model galaxies, as well as their collisions and creations, through the use of massively parallel systems.  Since the number of calculations that need to be performed scale on O(n$^2$), the length of simulations for very large systems can get to be quite large.  By dividing the work between many processors, the computation time can be reduced.  This division, however, also introduces a overhead in the form of message passing.  
-
-We will be investigating the performance benefits of parallelizing this algorithm.  We will also look into how much time the program spends in computation, IO operations, message passing, and waiting in barriers.  
-
-
-\section{Performance Expectations}
-
-Because this problem has a heavy emphasis on computation, we would hope to see a significant speedup over serial counterparts.  Although we would like to see a large computational speedup, the message passing overhead may negate this speedup for low processor counts.  
-
-All runs will be done on a spiral galaxy with 12,070 stars and 17,070 dark matter points.  This galaxy is approximately 120,000 parsecs across.  Our timesteps are on the order of 1000 years.
-
+We found that there have been many attempts to model galaxies, as well as their collisions and creations, through the use of massively parallel systems.  Since the number of calculations that need to be performed scale on O(n$^2$), the length of simulations for very large systems can get to be quite large.  By dividing the work between many processors, the computation time can be reduced.
 
 \section{Implementation}
 
@@ -54,7 +44,7 @@ As stated above, we modeled a spiral galaxy for a set number of stars.  The unde
 
 The main problem illustrated here is an application of the N-body problem:  we have potentially billions of stars that are interacting with each other to create a stable, rotating, system.  Each of the stars are treated as a point mass with location, velocity, and mass.  Based on the positions of these stars, we can calculate the gravitational forces between every pair of points (since it is inversely proportional to the distance between them) and then modify their respective velocities and locations.  
 
-Since we want to obtain an accurate depiction of the real galaxies in the universe, we must also add dark matter.  There are many different theories as to how dark matter is distributed, and we will explain the model that we used for this simulation in Section \ref{subsec:dark_matter_section}. 
+Since we want to obtain an accurate depiction of the real galaxies in the universe, we must also add dark matter.  There are many different theories as to how dark matter is distributed, and we will explain the model that we used for this simulation in the section concerning dark matter below.
 
 \subsection{Data Structures}
 
@@ -69,29 +59,54 @@ For the purpose of this project, we treated dark matter as distribution of stars
 
 \subsection{Initial Conditions}
 
-In order to accurately create an initial distribution of our galaxy, it is important to understand the mass distribution.  For a spiral galaxy, there are two mass distributions that we must take into account: a spherical bulge and a thin disk.  The spherical bulge is located at the center of the galaxy, with the thin disk surrounding it \cite{rotation-dynamics}.  
+In order to accurately create an initial distribution for the mass in a spiral galaxy, there are two mass distributions that we had to take into account: a spherical bulge and a thin disk.  The spherical bulge is located at the center of the galaxy, with the thin disk surrounding it \cite{rotation-dynamics}.  
 
-\begin{figure*}
+\begin{figure}[Ht!]
 \centering
-\includegraphics[width=2\columnwidth]{initial-conditions.png}
+\includegraphics[width=\columnwidth]{initial-conditions.png}
 \caption{The initial galaxy configuration.  It contains 12,070 stars. \label{fig:init-cond}}
-\end{figure*}
+\end{figure}
 
-Since we did not want to focus on galaxy formations, we wanted to create an initial model that mirrors a real galaxy.  To accomplish this, we examined the structure of spiral galaxies.  
+Since we did not want to focus on galaxy formations, we wanted to create an initial model that mirrors a real galaxy.  To generate the initial positions of the stars in the galaxy, we had to consider several properties of a spiral galaxy:
+\begin{enumerate}
+  \item Shape of the spiral arms and central bulge. 
+  \item The density of the stars
+  \item The velocity of the stars 
+  \item The distribution of the dark matter. 
+\end{enumerate}
 
-Spiral galaxies have the characteristic arms due to variations in density in the system.  Density Wave Theory suggests that the large-scale structure of spirals is a result of a small amplitude waves that revolve around the galaxy at a speed different from the gas and stars.  Another way to think about this is in terms of the individual stars' orbits: each star travels in slightly elliptical orbits and the orientation of their orbits is correlated in a smooth way with increasing distance from the galactic center \cite{spiral-arms}.  See Figure \ref{fig:spiral-arms} for a visualization of this concept.  
-
-\begin{figure}
+In a standard spiral galaxy the arms have the shape of a logarithmic spiral. For this project we used the spiral density waves theory first developed by C. C. Lin and Frank Shu in 1964. In this model, stars have elliptical orbits and the size and rotation of these ellipses varies in a correlated way. Figure \ref{fig:spiral-arms} shows an example of this.
+\begin{figure}[Ht!]
 \centering
 \includegraphics[width=.8\columnwidth]{spiral-arms.png}
 \caption{An explanation of spiral galaxy arms.  The ellipses are stars' orbits around the galactic center.  The arms are areas of high density. \label{fig:spiral-arms}}
 \end{figure}
 
-To populate our galaxy, we took this concept and created a randomized set of ellipses that rotated and increased in size around the center of our galaxy.  We then populate each ellipse with stars where their positions are also slightly randomized.  To assign velocities we were able to find experimental data of velocity distributions \cite{velocity-distributions} and perform a linear fit on the observed data values.  These values were assigned to the stars on each ellipse. This finishes the populating of the thin disk.
+The density of stars in a spiral galaxy is distributed according to $e^{-r}$. To generate a distribution that fit this model we created a list of ellipses, in the form of a parametric equation, that fit the model above where the density of ellipses went as $e^{-r}$. Then each ellipse was filled with the same number of stars, at a random location along the ellipse which was then slightly perturbed. The z component was then fit to a normal distribution about the x-y plane. Around the center of a normal spiral galaxy there is a central bulge. We approximated this with a constant density sphere around the origin.
 
-To create the spherical bulge at the center of the galaxy, we used an isothermal sphere with circular orbits.  Positions and velocities were determined using the method described above.
+\begin{figure}[Ht!]
+\centering
+\includegraphics[width=.8\columnwidth]{rotation_curve.png}
+\caption{The rotation curve we fit our initial velocities to. \cite{velocity-distributions} } 
+\label{fig:vel}
+\end{figure}
+To find the velocities of the stars we fit the velocities to a measured rotation curve -CITE- Figure \ref{fig:vel} shows the data we fit to. The velocities in the spiral arms were then pointed along the direction of the ellipse, with a small random component. For the central bulge we had the orbits be circular around the origin but in a random plane. 
 
-We wanted to start with an accurate initial distribution rather than modeling galaxy formations because we were interested in the stability of the system.  We wanted to see if the gravitational forces from the stars and from the dark matter could keep the galaxies in a somewhat stable orbit around its center of mass.  See Figure \ref{fig:init-cond} for a rendering of our initial galaxy star distribution.
+\begin{figure}[Ht!]
+ \centering
+ \includegraphics[width=0.5\textwidth]{./rotation.png}
+  \caption{The rotation curve of the stars in a typical spiral galaxy. Curve A is the results predicted by Newtonian mechanics. Curve B is the observed results. \href{http://en.wikipedia.org/wiki/Galaxy_rotation_curve}{Source}}
+ \label{fig:rot}
+\end{figure}
+
+Figure \ref{fig:rot} shows evidence for the presence of dark matter in a typical galaxy. The rotation curve of the stars in a typical spiral galaxy. Curve A is the results predicted by Newtonian mechanics. Curve B is the observed results. We also must include dark matter if we want our galaxy to be stable. We choose a spherical, constant density halo distribution of dark matter around the galaxy. Figure \ref{fig:dark} shows an example of a distribution we used. The actual distribution was dense, it was thinned out for clarity.
+
+\begin{figure}[Ht!]
+ \centering
+ \includegraphics[width=\textwidth]{./darkmatterdist.png}
+  \caption{Shows a version of the dark matter distribution we used. The actual distribution was dense, it was thinned out for clarity. } 
+ \label{fig:dark}
+\end{figure}
 
 \subsection{Input and Output}
 \label{subsec:io}
@@ -120,7 +135,7 @@ If you sum up every one of these small contributions from ever on of its neighbo
 
 Acceleration is only calculated for each of the stars - since the dark matter is not moving or changing, we have no need to calculate the acceleration for those points.
 
-These small additions are recorded in the acceleration portion of the star data structure, as mentioned above, where they can be processed at the conclusion of all the pairwise comparisons.  At this point, we use Verlet's Integration algorithm to use the accelerations to advance the stars along their trajectories according to a numerical integration scheme. Verlet's velocity formulas use the current positions, velocities, and accelerations of the star to determine its projected position and velocity at a later timestep \cite{verlet}.  These  formulas are as follows:
+These small additions are recorded in the acceleration portion of the star data structure, as mentioned above, where they can be processed at the conclusion of all the pairwise comparisons.  At this point, we use the Verlet integration algorithm to use the accelerations to advance the stars along their trajectories according to a numerical integration scheme. Verlet's velocity formulas use the current positions, velocities, and accelerations of the star to determine its projected position and velocity at a later timestep \cite{verlet}.  These  formulas are as follows:
           
 \begin{equation}
 {\bf r}(t + \Delta t) = {\bf r}(t) + {\bf v}(t) \Delta t + \frac{1}{2} {\bf a}(t) \Delta t^{2}
@@ -134,105 +149,19 @@ Where ${\bf r}$ is the position, ${\bf v}$ is the velocity, ${\bf a}$ is the acc
 
 In order to maintain synchronization across all processors, an MPI Barrier is used to keep all processors on the same timestep.  Once all processors have passed the barrier, this process is then repeated. 
 
-\section{Performance Results}
+\subsection{Parameters}
 
-For all of our performance results, we started with a galaxy consisting of 12,070 stars and 17,070 dark matter points.  We used a timestep equal to 1 (equivalent to 1000 years based on our choice of units), and ran all of our tests for 100 timesteps to get a performance baseline.  We will break our results down into five sections based on the type of performance measured.
+For all of our tests, we started with a galaxy consisting of 12,070 stars and 17,070 dark matter points.  The timescale was chosen such that 1 timestep was equivalent to 1000 years, and we ran all of our tests for 100 timesteps to get a performance baseline.  For each run of the program, the processors initialized the galaxy by reading in values stored in the two initialization files.  The first file is a list of all the stars in the galaxy and the second file is a list of the dark matter points.  Every 10 timesteps, the processors wrote the states of all the stars to a file for later graphing.
 
-All of these performance tests were run on the \texttt{Kratos} system using between 1 and 16 processors.  
+\section{Obstacles and Difficulties}
 
-\subsection{Overall Runtime}
+In the course of implementing our simulation, we went through several iterations of the code as we ran into implementation difficulties.  Our first iteration was written under the assumption that the Blue Gene had global memory access (i.e. that we could have one global array that was shared between nodes as long as each node wrote to a different portion of the array) due to a misreading of the MPI specifications.  Changing the code to use standard message passing for the global array wasn't difficult, but it did take up time that could have been spent on testing.
 
-\begin{figure}
-\centering
-\includegraphics[width=\columnwidth]{overall-runtimes.png}
-\caption{The overall runtimes for a variable number of processors.  These runtimes are measure on a per processor basis.  The simulation container 12,070 stars and 17,070 dark matter points and repeated for 100 timesteps. \label{fig:overall-runtimes}}
-\end{figure} 
+Once we fixed the global variable issue, we ran into trouble with the CCNI Blue Gene.  Specifically, we ran into a persistent input/output error where the initial data file could be opened successfully but the processors would all idle for no discernable reason when attempting to actually read in the data.  The Blue Gene did not give a verbose error message, and there was a very long latency between submitting each run and starting each run due to the parallel computing classes taking up computation time with their final projects, which made debugging difficult; the code ran successfully on Kratos and the computer science cluster, so we abandoned the Blue Gene and used Kratos instead so as not to waste time on fixing that issue.
 
-See Figure \ref{fig:overall-runtimes} for an overview of the overall runtimes of our algorithm.  These runtimes were measured for each processor separately.
+Finally, we ran into problems with the units used for gravitation.  Originally, to keep the numbers small, we used parsecs for distance, which resulted in a G that was too small (order of $10^{-9}$) and caused some of the stars at the very largest distances to return a gravitational force of $NaN$ after dividing this G by a distance on the order of 200,000 parsecs.  We unfortunately did not catch this error until after running our first simulation overnight for several thousand timesteps, which meant that we lost time for our subsequent runs.  After converting our units used to milliparsecs and adjusting our calculations accordingly, we resolved the $NaN$ issue.
 
-\subsection{Compute Times}
-
-\begin{figure}
-\centering
-\includegraphics[width=\columnwidth]{compute-runtimes.png}
-\caption{The amount of time each processor spent doing computational work.  It does not include time spent in barriers or time spent waiting for sends or recives to complete. The simulation contained 12,070 stars and 17,070 dark matter points and repeated for 100 timesteps. \label{fig:compute-runtimes}}
-\end{figure} 
-
-See Figure \ref{fig:compute-runtimes} for an overview of the runtimes for the computationally intensive sections of our algorithm.  This includes the traversal through the received array of stars and calculating the forces between every pair.  It does not include time waiting in barriers or waiting for messages to be sent or received.  These runtimes are valid for a single processor.  The average is indicated on the graph as the line.
-
-\subsection{Message Passing}
-
-\begin{figure}
-\centering
-\includegraphics[width=\columnwidth]{message-runtimes.png}
-\caption{The amount of time each processor spent with MPI messaging. The simulation contained 12,070 stars and 17,070 dark matter points and repeated for 100 timesteps. \label{fig:message-runtimes}}
-\end{figure} 
-
-Message passing runtimes can be found in Figure \ref{fig:message-runtimes}.  The runtimes are measured according to each individual processor in the job. Again, the average for a given number of processors is indicated by the line on the graph.
-
-\subsection{Barrier Waits}
-
-\begin{figure}
-\centering
-\includegraphics[width=\columnwidth]{barrier-runtimes.png}
-\caption{The amount of time each processor spent waiting at a barrier. The simulation contained 12,070 stars and 17,070 dark matter points and repeated for 100 timesteps. \label{fig:barrier-runtimes}}
-\end{figure} 
-
-Because our algorithm relies on a synchronized clock to maintain timesteps, it is inevitable that some processors may wait in a barrier.  Figure \ref{fig:barrier-runtimes} shows the barrier waits of each processor as a function of the number of processors in the system. 
-
-\subsection{IO Operations}
-
-\begin{figure}
-\centering
-\includegraphics[width=\columnwidth]{io-runtimes.png}
-\caption{The amount of time each processor spent writing and reading to file. The simulation contained 12,070 stars and 17,070 dark matter points and repeated for 100 timesteps. \label{fig:io-runtimes}}
-\end{figure} 
-
-For each run of the program, the processors must initialize the galaxy by reading in values stored in the two initialization files.  The first file is a list of all the stars in the galaxy and the second file is a list of the dark matter points.  At a later point, the processors will then write the states of all the stars to a file for reading.  Figure \ref{fig:io-runtimes} shows the read and write times of each processor.  In this case, the processor reads once and writes once.
-
-\section{Analysis}
-
-\begin{figure}
-\centering
-\includegraphics[width=\columnwidth]{speedups-overall.png}
-\caption{The speedup of the parallelized algorithm for different processor counts.  Each of the times are measured per processor. \label{fig:speedups-overall}}
-\end{figure} 
-
-As expected, the parallelized version performed better than the serialized version.  At low processor counts, however, the two algorithms completed in approximately the same time.  This is due to the MPI message passing overhead that we had mentioned earlier. As seen in Figure \ref{fig:overall-runtimes}, the run with two processors actually took slightly longer to run than the run with only one processor.  
-
-See Figure \ref{fig:speedups-overall} for the speedups at different processor counts.  In this graph, a value of 1 indicates the time it took for 1 processor to finish the job. We can see that the speedup increases in a logarithmic fashion as the number of processors increases.
-
-\begin{figure}
-\centering
-\includegraphics[width=\columnwidth]{speedups-compute.png}
-\caption{The speedup experienced in compute times as a function of the number of processors on the job. \label{fig:speedups-compute}}
-\end{figure} 
-
-In terms of compute time, we see an even greater speedup as we increase the number of processors (see Figure \ref{fig:speedups-compute}).  This speedup is nearly linear.  As we increase the number of processors, we also see that there is a smaller standard deviation in the compute times (in Figure \ref{fig:compute-runtimes}).  This is to be expected - with smaller computation tasks per processor, there is a smaller window for variation. 
-
-Message passing was the most time consuming task in this algorithm.  As the number of processors increased, the sum of all time spent in message related tasks remained about the same, but with respect to each processor, the time spent decreases (Figure \ref{fig:message-runtimes}).  Since the same amount of messages is being passed around, this would be what we expect.  For example, if we have 2 processors, we have one large array that we need to send only once.  In larger processor counts, we have one small array, but we need to send this small array many times over the course of one timestep.  Because of this, we see a relatively constant messaging runtime.
-
-As we can see from Figure \ref{fig:barrier-runtimes}, the time spent in barriers decreases drastically as the number of processors increase.  These barriers are located at the start of each timestep to ensure that all processors are using current positions of the stars in the galaxy.  In a one processor system, is are no barrier wait (as expected).  For a two processor system, the time spent in barriers is enormous.  Since each processor has a large amount of computation (and message passing) to do, there is a large potential for variation in observed runtimes.  This would cause the processors to become asynchronous and would require one to wait on the other.  As the processor count increases, each processor will have a smaller star size to perform calculations on, so the runtimes are more consistent.  This would, in turn, result in the processors spending a shorter amount of time in the barrier call.
-
-In general, the amount of time spent in the input and output operations is almost negligible in comparison with any other aspect (Figure \ref{fig:io-runtimes}).  This is mainly because we are  reading or writing only once in our chosen time range, but even if we normalize all of our values per timestep, we see that the IO operations, are still very small. As expected, read times are faster than write times although they both appear to be leveling out at high processor counts. 
-
-\subsection{Performance Improvements}
-
-\begin{figure}
-\centering
-\includegraphics[width=\columnwidth]{Smallmessage-runtimes.png}
-\caption{The amount of time each processor spent with MPI messaging using a smaller message size. The simulation contained 12,070 stars and 17,070 dark matter points and repeated for 100 timesteps. \label{fig:Smallmessages-runtimes}}
-\end{figure} 
-
-\begin{figure}
-\centering
-\includegraphics[width=\columnwidth]{Smallmessages-total.png}
-\caption{The total runtime for each processor as a result of using a smaller message size. The simulation contained 12,070 stars and 17,070 dark matter points and repeated for 100 timesteps. \label{fig:Smallmessages-total}}
-\end{figure} 
- 
-To decrease some of the messaging overhead, we should define a second datatype that would only store the positions and masses of the stars and/or dark matter.  This datatype would be what each of the processors pass via MPI messages.  Implementing this would shrink the size of messages to 40\% of the current size, and thus reduce the time devoted to message passing.  Under this new architecture, the values of the velocity and acceleration are only stored on the host processor since are of no use to the other processors for gravitational calculations.  
-
-We decided to implement this and run the simulations under the same conditions as before.  As expected, the time devoted to message passing greatly decreased.  The results can be found in Figures \ref{fig:Smallmessages-runtimes} and \ref{fig:Smallmessages-total}.  Overall, we saw a 400\% speedup over our previous implementation.
+Due to time and computational constraints, we were forced to reduce the size of our galaxy from millions or billions of stars to tens of thousands of stars, and this forced us to recalibrate our initial data to fit a sparser but just as massive galaxy.  We had several runs end with the galaxy tearing itself apart before we obtained a working dark matter and star distribution.
 
 \section{Future Work}
 
@@ -244,7 +173,7 @@ If we had some more time to work on this, we would like to extend our current si
 
 \subsection{SPH Trees}
 
-Our current implementation of the galaxy simulation utilizes the simple parallelization of a pairwise matching scheme. While this method reduces well onto a large parallel system, it has a O(N$^2$)computation performance. The parallel nature allows optimization over the number of stars per processors in our system.  If the computations were optimized over coordinate space instead, the number of computations could be reduced further.  This would be achieved through the use of star clusters based on their relative positions in space. This method requires the subdivision of the galaxy space into sectors which could then be exported into tree structure.
+Our current implementation of the galaxy simulation utilizes the simple parallelization of a pairwise matching scheme. While this method reduces well onto a large parallel system, it has a O(N$^2$) computation performance. The parallel nature allows optimization over the number of stars per processors in our system.  If the computations were optimized over coordinate space instead, the number of computations could be reduced further.  This would be achieved through the use of star clusters based on their relative positions in space. This method requires the subdivision of the galaxy space into sectors which could then be exported into tree structure.
 
 Under a tree structure, each individual star would be stored in a leaf node.  The intermediate nodes can be represented as the center of mass of their children.  Siblings would be determined based on locality - stars that are in each others' immediate vicinity are more likely to be siblings than others.  In this manner, gravitational forces can be calculated using a much smaller set of points.  For stars on opposite sides of the galaxy, for example, we can approximate the gravitational force by using a multipole expansion of the intermediate nodes. This could reduce overall computations for each timestep.
 
@@ -268,13 +197,7 @@ In addition to gravitational forces, electromagnetic forces from plasma play an 
 
 \section{Conclusions}
 
-This project gave us a good insight into the world of astrophysics simulations.  Although our implementation is a very small scale model of the real galaxies present in our universe, the main concepts remain the same. 
-
-We found that as the processor size increased, the actual computation became the main contributor to the total runtime.  Message passing was still a significant portion, and reducing the size of the messages greatly improved performance.  
-
-\section{Team Code}
-
-The code for this project can be found under Amanda's \texttt{Kratos} account under \texttt{olyhaa/finalProject}.  There is a README there for information on how to run the program and modify parameters.
+This project gave us a good insight into the world of astrophysics simulations.  Although our implementation is a very small scale model of the real galaxies present in our universe, the main concepts remain the same.  While we were not able to simulate the galaxy as long as we wanted or as efficiently as we wanted due to time constraints, and while we ran into plenty of difficulties in the implementation, we still consider this a valuable learning experience despite the difficulties.
 
 \begin{thebibliography}{99}
 
