@@ -71,13 +71,10 @@ void getStarInfo(char* fileName, char* darkMatter) {
   // reset counters
   io_count = b_count = comp_count = msg_count = 0;
 
-
-  // get size of dark matter file
-  num_dark = 17071;
+  num_dark = 6058;
   if (num_dark % my_size != 0)
-      num_dark -= num_dark % my_size;
+    num_dark -= num_dark %my_size;
   num_dark /= my_size;
-
   start = rdtsc();
   
   // get file, open it
@@ -105,7 +102,7 @@ void getStarInfo(char* fileName, char* darkMatter) {
   num_stars = NUMBER_OF_STARS / my_size;
 
   if (my_rank == 0)
-    printf("%d: We have %ld stars, each processor has %d stars and %d dark matter 'stars'.\n",  my_rank, NUMBER_OF_STARS, num_stars, num_dark);
+    printf("%d: We have %ld stars, each processor has %d stars.\n",  my_rank, NUMBER_OF_STARS, num_stars);
  
   galaxy = (mpi_star*) malloc((num_stars + num_dark) * sizeof(mpi_star));
   recv_array = (mpi_star*) malloc((num_stars + num_dark) * sizeof(mpi_star));
@@ -139,13 +136,22 @@ void getStarInfo(char* fileName, char* darkMatter) {
     exit(1);
   }
 
+  if (my_rank == 0)
+    printf("%d: Each processor has %d dark matter 'stars'.\n",  my_rank, num_dark);
+
+  // barrier - to make sure num_dark has been set before continuing
+  if (MPI_Barrier(MPI_COMM_WORLD) != MPI_SUCCESS) {
+    printf("MPI_Barrier error in processor %d \n", my_rank);
+    exit(1);
+  }
+
   line_length = 58+19;
   for (i = 0; i < num_dark; i++) {
     offset = my_rank * line_length * num_dark + i * line_length;
 
     MPI_File_read_at(file, offset, buf, line_length, MPI_CHAR, &status);
 
-    sscanf(buf, "%lf,%lf,%lf\n", &x_p, &y_p, &z_p, &m);
+    sscanf(buf, "%lf,%lf,%lf,%lf\n", &x_p, &y_p, &z_p, &m);
 
     // malloc all galaxy arrays
     (stars[i + num_stars]).x_pos = (galaxy[i + num_stars]).x_pos = x_p;
@@ -156,7 +162,6 @@ void getStarInfo(char* fileName, char* darkMatter) {
     (stars[i + num_stars]).z_v   = 0;
     (stars[i + num_stars]).mass  = (galaxy[i + num_stars]).mass  = m; 
   }
-  
   // close file
   MPI_File_close(&darkfile);
 
@@ -221,7 +226,7 @@ int printStarInfo(char* fileName) {
   for (i = 0; i < num_stars; i++) {
     offset = my_rank * line_length * num_stars + i * line_length + 13;
     
-    sprintf(buf, "% 018lf,% 018lf,% 018lf,% 018lf,% 018lf,% 018lf,% 018lf\n", stars[i].x_pos, stars[i].y_pos, stars[i].z_pos, stars[i].x_v, stars[i].y_v, stars[i].z_v, stars[i].mass);
+    sprintf(buf, "% 018.2lf,% 018.2lf,% 018.2lf,% 018.2lf,% 018.2lf,% 018.2lf,% 018.2lf\n", stars[i].x_pos, stars[i].y_pos, stars[i].z_pos, stars[i].x_v, stars[i].y_v, stars[i].z_v, stars[i].mass);
   
     MPI_File_write_at(file, offset, buf, line_length, MPI_CHAR, &status);
   }
@@ -281,7 +286,7 @@ int printAnimations(char* fileName) {
   for (i = 0; i < num_stars; i++) {
     offset = my_rank * line_length * num_stars + i * line_length;
     
-    sprintf(buf, "% 018lf,% 018lf,% 018lf\n", stars[i].x_pos, stars[i].y_pos, stars[i].z_pos);
+    sprintf(buf, "% 018.2lf,% 018.2lf,% 018.2lf\n", stars[i].x_pos, stars[i].y_pos, stars[i].z_pos);
 
     MPI_File_write_at(file, offset, buf, line_length, MPI_CHAR, &status);
   }
