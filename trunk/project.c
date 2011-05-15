@@ -13,7 +13,6 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER 
  * DEALINGS IN THE SOFTWARE.
  */
-
 #ifndef GALAXY_SIM_PROJECT_C
 #define GALAXY_SIM_PROJECT_C
 
@@ -28,11 +27,11 @@
 
 /********** Variable Definitions **********/
 
-#define OUTPUT_INTERVAL 100	// Number of timesteps between each output to filex
-#define MAX_COUNT 100	        // Maximum number of iterations
-#define TIMING_INTERVAL 100     // Number of timesteps between timing stats
+#define OUTPUT_INTERVAL 200	// Number of timesteps between each output to filex
+#define MAX_COUNT 10000	        // Maximum number of iterations
+#define TIMING_INTERVAL 5000     // Number of timesteps between timing stats
 #define DISPLAY_INTERVAL 5     // Number of timesteps between each output to screen 
-#define ANIMATION_INTERVAL 200   // Number of timesteps between each output for animation
+#define ANIMATION_INTERVAL 5   // Number of timesteps between each output for animation
 
 /********** Variable Declarations **********/
 
@@ -99,7 +98,7 @@ int main(int argc, char* argv[])
 		  sprintf(cstr, "%04d", count);
 		  strcat(str, cstr);
 		  strcat(str, ".txt");
-		  printStarInfo(str, 1);
+		  printStarInfo(str);
 		}
 
 		// print out positions for animations
@@ -111,7 +110,7 @@ int main(int argc, char* argv[])
 		  sprintf(cstr, "%04d", count);
 		  strcat(str, cstr);
 		  strcat(str, ".txt");
-		  printStarInfo(str, 0);
+		  printAnimations(str);
 		}
 
 		// print out step to screen
