@@ -55,7 +55,7 @@ typedef struct
 /********** Variable Definitions **********/
 
 #define STARS_IN_CLUSTER 1		// See description of cluster() function
-#define UPDATE_INTERVAL 50		// Number of timesteps between updates of closest stars
+#define UPDATE_INTERVAL 1		// Number of timesteps between updates of closest stars
 
 /********** Variable Declarations **********/
 
@@ -183,7 +183,7 @@ void apply_gravitation(int i)
  */
 void force_of_gravity(int self, mpi_star other)
 {
-        double G = 4.49734287 * pow(10.0,-9);	// Gravitational constant, using units of parsecs * (solar mass units)^-1 * (parsecs/millennium)^2
+        double G = 4.49734287 ;	// Gravitational constant, using units of parsecs * (solar mass units)^-1 * (parsecs/millennium)^2
 	double r = distance(stars[self], other);
 	double force = G * stars[self].mass * other.mass;
 	if(r < pow(10,-5))

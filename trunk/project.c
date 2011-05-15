@@ -28,7 +28,7 @@
 /********** Variable Definitions **********/
 
 #define OUTPUT_INTERVAL 200	// Number of timesteps between each output to filex
-#define MAX_COUNT 10000	        // Maximum number of iterations
+#define MAX_COUNT 100	        // Maximum number of iterations
 #define TIMING_INTERVAL 5000     // Number of timesteps between timing stats
 #define DISPLAY_INTERVAL 5     // Number of timesteps between each output to screen 
 #define ANIMATION_INTERVAL 5   // Number of timesteps between each output for animation
@@ -228,6 +228,7 @@ void perform_calculations()
 	for (i=0;i<num_stars;i++)
 	  {
 		stars[i].x_pos = stars[i].x_pos + stars[i].x_v + 0.5 * stars[i].x_acc;
+//       printf("%lf\n",stars[i].x_acc);
 		stars[i].y_pos = stars[i].y_pos + stars[i].y_v + 0.5 * stars[i].y_acc;
 		stars[i].z_pos = stars[i].z_pos + stars[i].z_v + 0.5 * stars[i].z_acc;
 
