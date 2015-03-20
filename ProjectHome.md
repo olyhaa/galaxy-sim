@@ -1,0 +1,1 @@
+The aim of this project is to provide a relatively-complete model of a galaxy--simulating gravitation, electromagnetism(maybe), and other factors--to allow us to model the effects of dark matter on galactic stability and composition.
